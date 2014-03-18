@@ -10,6 +10,8 @@
 		6E1795A718D711E200AD8B0F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E1795A618D711E200AD8B0F /* Foundation.framework */; };
 		6E1795AA18D711E300AD8B0F /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6E1795A918D711E300AD8B0F /* main.m */; };
 		6E1795AE18D711E300AD8B0F /* makecoversheet.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6E1795AD18D711E300AD8B0F /* makecoversheet.1 */; };
+		6EF2514918D8654800176F40 /* YVSCreateCGContext.m in Sources */ = {isa = PBXBuildFile; fileRef = 6EF2514818D8654800176F40 /* YVSCreateCGContext.m */; };
+		6EF2514C18D8AC4C00176F40 /* YVSMakeCoverSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 6EF2514B18D8AC4C00176F40 /* YVSMakeCoverSheet.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -31,6 +33,10 @@
 		6E1795A918D711E300AD8B0F /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		6E1795AC18D711E300AD8B0F /* makecoversheet-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "makecoversheet-Prefix.pch"; sourceTree = "<group>"; };
 		6E1795AD18D711E300AD8B0F /* makecoversheet.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = makecoversheet.1; sourceTree = "<group>"; };
+		6EF2514718D8654800176F40 /* YVSCreateCGContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = YVSCreateCGContext.h; sourceTree = "<group>"; };
+		6EF2514818D8654800176F40 /* YVSCreateCGContext.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = YVSCreateCGContext.m; sourceTree = "<group>"; };
+		6EF2514A18D8AC4C00176F40 /* YVSMakeCoverSheet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = YVSMakeCoverSheet.h; sourceTree = "<group>"; };
+		6EF2514B18D8AC4C00176F40 /* YVSMakeCoverSheet.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = YVSMakeCoverSheet.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +80,10 @@
 			isa = PBXGroup;
 			children = (
 				6E1795A918D711E300AD8B0F /* main.m */,
+				6EF2514718D8654800176F40 /* YVSCreateCGContext.h */,
+				6EF2514818D8654800176F40 /* YVSCreateCGContext.m */,
+				6EF2514A18D8AC4C00176F40 /* YVSMakeCoverSheet.h */,
+				6EF2514B18D8AC4C00176F40 /* YVSMakeCoverSheet.m */,
 				6E1795AD18D711E300AD8B0F /* makecoversheet.1 */,
 				6E1795AB18D711E300AD8B0F /* Supporting Files */,
 			);
@@ -139,6 +149,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6EF2514918D8654800176F40 /* YVSCreateCGContext.m in Sources */,
+				6EF2514C18D8AC4C00176F40 /* YVSMakeCoverSheet.m in Sources */,
 				6E1795AA18D711E300AD8B0F /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -152,6 +164,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
@@ -189,6 +202,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
@@ -251,6 +265,7 @@
 				6E1795B318D711E300AD8B0F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
