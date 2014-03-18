@@ -53,6 +53,7 @@
         self.softwareRender = softwareRender;
         self.context = context;
         self.backgroundColor = backColor;
+        self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
     }
     return self;
 }
@@ -78,12 +79,12 @@
         cgContext = CGBitmapContextCreate(NULL,
                                           [self calculateCoverSheetWidth],
                                           [self calculateCoverSheetHeight],
-                                          32, // 32 bits per component.
+                                          8, // 32 bits per component.
                                           0,
                                           colorSpace,
-                                          bitmapInfo |
-                                          kCGBitmapFloatComponents |
-                                          kCGBitmapByteOrder32Little);
+                                          bitmapInfo); //|
+                                          //kCGBitmapFloatComponents |
+                                          // kCGBitmapByteOrder32Little);
         self.context = cgContext;
         CGContextRelease(cgContext);
     }

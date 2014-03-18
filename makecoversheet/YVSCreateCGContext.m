@@ -230,8 +230,8 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
     size_t rowIndex = localIndex / columns;
     size_t columnIndex = localIndex % columns;
     destRect.origin.x = (1 + columnIndex) * borderSize +
-    columnIndex * outputExtent.size.width;
+                                columnIndex * scaledImageSize.width;
     destRect.origin.y = (1 + rowIndex) * borderSize +
-    rowIndex * outputExtent.size.height;
+                                rowIndex * scaledImageSize.height;
     [context drawImage:outputImage inRect:destRect fromRect:outputExtent];
 }

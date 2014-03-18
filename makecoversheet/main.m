@@ -153,13 +153,20 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 		
 		if ( ! strcmp ( args, "source" ) )
 		{
-			[self setSourcePath: @(*argv++) ];
+			[self setSourcePath: [@(*argv++) stringByExpandingTildeInPath] ];
 			gotsource = YES;
 			argc--;
 		}
 		else if (( ! strcmp ( args, "dest" )) || ( ! strcmp ( args, "destination" )) )
 		{
 			NSString *expandedPath = [@(*argv++) stringByExpandingTildeInPath];
+            NSFileManager *fileManager = [NSFileManager defaultManager];
+            NSError * __autoreleasing error = nil;
+            // Just assume creation of directories works. Don't check result.
+            [fileManager createDirectoryAtPath:expandedPath
+                   withIntermediateDirectories:YES
+                                    attributes:nil
+                                         error:&error];
 			[self setDestinationPath:expandedPath];
 			gotout = YES;
 			argc--;
@@ -518,6 +525,9 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		}
 		while( imageNumber < numTimes );
 		
+        [coverSheetMaker saveImageFileWithUTI:
+         (__bridge CFStringRef)[self exportImageFileType]];
+        
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");
 		
@@ -639,7 +649,8 @@ int main (int argc, const char * argv[], const char* environ[])
 	BOOL success = NO;
 	@autoreleasepool
 	{
-		AVFrameGrab* frameGrabber = [[AVFrameGrab alloc] initWithArgs:argc argv:argv
+		AVFrameGrab* frameGrabber = [[AVFrameGrab alloc] initWithArgs:argc
+                                                                 argv:argv
 															  environ:environ];
 		if (frameGrabber)
 			success = [frameGrabber run];
