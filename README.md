@@ -20,7 +20,7 @@ A command line tool "makecoversheet".
 I'm running a MacBookPro9,1. That's a quad core i7 running at 2.3 GHz, 16GByte of Ram, and a 500 GByte SSD drive. Not Retina. Has a discrete and an integrated GPU.
 
 I tested the script on a 960x540 hour long Apple MPEG4 movie file.
-I requested a frame grab every 3 seconds. This resulted in 1202 frames. The cover sheets are 1310x810 pixels in size with a grid of 5x5 thumbnails drawn to each coversheet. This generated 48 full cover sheets, and one coversheet with 2 images. The background was redrawn each time a coversheet was saved. There is a border which is at a minimum 10 pixels wide between each image.
+I requested a frame grab every 3 seconds. This resulted in 1202 frames. The cover sheets are 1310x810 pixels in size with a grid of 5x5 thumbnails drawn to each coversheet. This generated 48 full cover sheets, and one coversheet with 2 images. The background was redrawn each time a coversheet was saved. There is a border which is at a minimum 10 pixels wide between each image. The cover sheets were saved as tiff files as I found especially in comparison to png files that this was significantly faster.
 
 With the colorspace pulled from the grame grabbed image, and using a RGB 8 bits per channel context the tool took 65.5 seconds to run.
 
