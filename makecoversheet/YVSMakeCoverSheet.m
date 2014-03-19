@@ -19,7 +19,6 @@
 
 @property (strong) CIFilter *ciFilter;
 @property (readonly, strong) CIContext *ciContext;
-@property (readonly, assign) BOOL useCoreImage;
 
 @property (assign) size_t numColumns;
 @property (assign) size_t numRows;
@@ -58,7 +57,6 @@
     self = [super init];
     if (self)
     {
-        self->_useCoreImage = YES;
         self.numColumns = cols;
         self.numRows = rows;
         self.borderSize = borderSize;
@@ -68,10 +66,7 @@
         self.softwareRender = softwareRender;
         self.context = context;
         self.backgroundColor = backColor;
-        if (self.useCoreImage)
-        {
-            self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
-        }
+        self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
     }
     return self;
 }
@@ -154,19 +149,16 @@
 
 -(void)resetCIContext
 {
-    if (self.useCoreImage)
+    if (self.context)
     {
-        if (self.context)
-        {
-            NSDictionary *optsDict;
-            optsDict = @{ kCIContextUseSoftwareRenderer : @(self.softwareRender) };
-            self->_ciContext = [CIContext contextWithCGContext:self.context
-                                                       options:optsDict];
-        }
-        else
-        {
-            self->_ciContext = nil;
-        }
+        NSDictionary *optsDict;
+        optsDict = @{ kCIContextUseSoftwareRenderer : @(self.softwareRender) };
+        self->_ciContext = [CIContext contextWithCGContext:self.context
+                                                   options:optsDict];
+    }
+    else
+    {
+        self->_ciContext = nil;
     }
 }
 
