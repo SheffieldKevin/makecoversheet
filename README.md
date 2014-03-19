@@ -34,6 +34,8 @@ When I tried using the software render 8 bits per channel linear Generic RGB col
 
 At 67 seconds the command line tool is processing approximately 18 frames per second.
 
+Running the tool without doing software render cpu usage was about 60%, with the software render cpu usage was about 120%.
+
 ### Where's the code:
 
 The file main.m is mostly about configuring the command line tool. Much of it ripped from Apple sample code for avframegrabber. The function AddImageToCoverSheetContextUsingCoreImage in YVSCreateCGContext.m is where the scaling happens, but setting up the preparation for doing that is done in the Objective C object of type YVSMakeCoverSheet which is defined and implemented in YVSMakeCoverSheet.h/.m. The command line tool uses CILanczosScaleTransform to do the image scaling.
