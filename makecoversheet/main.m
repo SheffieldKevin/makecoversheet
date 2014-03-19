@@ -6,7 +6,6 @@
 
 @import Foundation;
 @import AVFoundation;
-// @import AppKit;
 
 #import "YVSMakeCoverSheet.h"
 
@@ -22,6 +21,8 @@
 #define BACKGROUND_RED 0.2
 #define BACKGROUND_GREEN 0.2
 #define BACKGROUND_BLUE 0.7
+
+#define COREIMAGE_SOFTWARERENDER __objc_no
 
 // ---------------------------------------------------------------------------
 //		P R O T O T Y P E S
@@ -275,7 +276,6 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 		// Take a framegrab halfway through the movie.
 		CMTime frameTime = CMTimeMultiplyByFloat64(movieDuration, 0.5L);
 		NSValue *midVal = [NSValue valueWithCMTime:frameTime];
-        //		return [NSArray arrayWithObject:midVal];
 		return @[midVal];
 	}
 	Float64 inverseNumTimesM1 = 1.0L / (numberOfTimes - 1.0L);
@@ -284,8 +284,6 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 	NSMutableArray *cmTimesArray = [[NSMutableArray alloc] initWithCapacity:0];
 	for (NSInteger i=0 ; i < numberOfTimes ; ++i)
 	{
-        //		if (i == numberOfTimes - 1)
-        //			frameGrabTime.value--;
 		[cmTimesArray addObject:[NSValue valueWithCMTime:frameGrabTime]];
 		if (i == numberOfTimes - 2)
 			periodTime.value = periodTime.value - periodTime.timescale / 100;
@@ -412,7 +410,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
                                                       thumbmnailSize:thumbnailSize
                                                           destFolder:destURL
                                                             baseName:baseName
-                                                      softwareRender:NO
+                                                      softwareRender:COREIMAGE_SOFTWARERENDER
                                                            cgContext:nil
                                                      backgroundColor:color];
         CGColorRelease(color);
