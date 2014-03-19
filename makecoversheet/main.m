@@ -227,8 +227,8 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 	printf("		-listmetadata  Lists the metadata in the source movie before the export.  \n");
 	printf("		-listtracks  Lists the tracks in the source movie before exporting.  \n");
 	printf("	Sample export lines:\n");
-	printf("	./avframegrab -dest ~/Pictures/temp -listmetadata -source /path/to/myTestMovie.m4v -times 1.3,5.0,7.0,12.0 -filetype public.jpeg -basefilename Image\n");
-	printf("	./avframegrab -destination ~/Documents/temp -listtracks -source /path/to/myTestMovie.mov -times 0.2,0.4,0.6,0.8,1.0 -filetype public.png -basefilename Image\n");
+	printf("	./makecoversheet -dest ~/Pictures/temp -listmetadata -source /path/to/myTestMovie.m4v -times 1.3,5.0,7.0,12.0 -filetype public.jpeg -basefilename Image\n");
+	printf("	./makecoversheet -destination ~/Documents/temp -listtracks -source /path/to/myTestMovie.mov -period 3 -filetype public.tiff -basefilename Image\n");
 }
 
 - (NSArray *)createTimesFromSpecifiedTimes:(AVAsset *)urlAsset
