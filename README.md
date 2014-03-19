@@ -17,10 +17,13 @@ A command line tool "makecoversheet".
 
 The following is a print usage output produced if you call the command line tool without any parameters.
 
-./makecoversheet 
-makecoversheet - usage:
+	./makecoversheet
+	
+	makecoversheet - usage:
+	
 	./makecoversheet [-parameter <value> ...]
-	 parameters are all preceded by a -<parameterName>.  The order of the parameters is unimportant.
+	
+		 parameters are all preceded by a -<parameterName>.  The order of the parameters is unimportant.
 	 Required parameters are -source <sourcemovieFileURL> -dest <outputFolderURL>
 	 Source and destination URL strings cannot contain spaces or quoted/escaped.
 	 Available parameters are:
