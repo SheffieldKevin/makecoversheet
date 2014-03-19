@@ -40,32 +40,6 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 // ---------------------------------------------------------------------------
 
 @interface AVFrameGrab : NSObject
-/*
-{
-
-	NSString	*programName;
-	NSString	*exportImageFileType;
-	NSString	*sourcePath;
-	NSString	*destinationPath;	// The name of the directory.
-	NSString	*baseFileName;
-	NSString	*times;
-    // Initially implement only a version where the times for a screen grab are listed in command.
-    // But afterwards add a number version which specifies the number of screen grabs to be taken which
-    // are obtained at regular intervals during the length of the video. Also add a withperiod option
-    // that specifies the time between when each frames is grabbed. Since there will be three different
-    // ways to enter the times when screen grabs should happen, if more than one way is entered in the
-    // command arguments then the last option in the argument list will be the one that is used.
-	NSNumber	*progress;
-    //	NSInteger	imageNumber;
-	BOOL		showProgress;
-	BOOL		verbose;
-	BOOL		exportFailed;
-	BOOL		exportComplete;
-	BOOL		listTracks;
-	BOOL		listMetadata;
-    //	BOOL		removePreExistingFiles;
-}
-*/
 
 @property (strong) NSString	*programName;
 @property (strong) NSString	*exportImageFileType;
@@ -105,25 +79,6 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 // ---------------------------------------------------------------------------
 
 @implementation AVFrameGrab
-
-/*
-@synthesize programName;
-@synthesize exportImageFileType;
-@synthesize sourcePath;
-@synthesize destinationPath;
-@synthesize baseFileName;
-@synthesize times;
-@synthesize progress;
-// @synthesize imageNumber;
-@synthesize	verbose;
-@synthesize showProgress;
-@synthesize frameGrabComplete;
-@synthesize frameGrabFailed;
-@synthesize listTracks;
-@synthesize listMetadata;
-@synthesize frameGrabTimeType;
-*/
-// @synthesize removePreExistingFiles;
 
 -(id) initWithArgs: (int) argc  argv: (const char **) argv environ: (const char **) environ
 {
@@ -383,6 +338,8 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 	BOOL	success = YES;
 	AVAsset *sourceAsset = nil;
     
+    dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0LL);
+    
 	@autoreleasepool
 	{
 		NSParameterAssert( [self sourcePath] != nil );
@@ -476,12 +433,13 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		{
 			@autoreleasepool
 			{
+/*
 				NSString *requestedTimeString = (NSString *)CFBridgingRelease(
                                     CMTimeCopyDescription(NULL, requestedTime));
 				NSString *actualTimeString = (NSString *)CFBridgingRelease(
                                     CMTimeCopyDescription(NULL, actualTime));
-				NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-				
+                NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
+*/
 				if (result == AVAssetImageGeneratorSucceeded)
 				{
                     [coverSheetMaker drawToCoverSheetThumbnail:image];
@@ -518,7 +476,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			{
 				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
 				printNSString([NSString stringWithFormat:
-                               @"generateCGImagesAsynchronouslyForTimes running  progress=%3.2f%%",
+                @"generateCGImagesAsynchronouslyForTimes running  progress=%3.2f%%",
                                imageNumber*100.0 / numTimes]);
 			}
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
@@ -542,6 +500,11 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 					   [self sourcePath], [self destinationPath],
 					   (success ? "YES" : "NO")]);
 	}
+    dispatch_time_t finish = dispatch_time(DISPATCH_TIME_NOW, 0LL);
+    uint64_t delta = finish - start;
+    double seconds = 1.0e-09 * delta;
+    printNSString([NSString stringWithFormat:
+                   @"Time to process movie frames = %3.2f seconds", seconds]);
 bail:
 	return success;
 }

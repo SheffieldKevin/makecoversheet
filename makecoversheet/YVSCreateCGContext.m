@@ -206,12 +206,12 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
                                                size_t rows,
                                                CGFloat borderSize,
                                                CGSize scaledImageSize,
-                                               size_t imageIndex)
+                                               size_t imageIndex,
+                                               size_t height)
 {
     // Assumes context is big enough to draw the image into.
     // Assumes up and to the right is positive and bottom left corner is at 0,0
     size_t localIndex = imageIndex % (columns * rows);
-    //    CIFilter *scaleFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
     CIImage *ciImage = [[CIImage alloc] initWithCGImage:image];
     [scaleFilter setDefaults];
     [scaleFilter setValue:ciImage forKey:@"inputImage"];
@@ -229,9 +229,13 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
     destRect.size = scaledImageSize;
     size_t rowIndex = localIndex / columns;
     size_t columnIndex = localIndex % columns;
+    //(1 + numRows) * self.borderSize + numRows * self.thumbnailSize.height;
+    
+    // size_t height = (rows-1)*(borderSize + scaledImageSize.height) + 2*borderSize;
     destRect.origin.x = (1 + columnIndex) * borderSize +
                                 columnIndex * scaledImageSize.width;
-    destRect.origin.y = (1 + rowIndex) * borderSize +
-                                rowIndex * scaledImageSize.height;
+    //    destRect.origin.y = height - ((1 + rowIndex) * borderSize +
+    //                           rowIndex * scaledImageSize.height);
+    destRect.origin.y = height - ((1 + rowIndex) * (borderSize + scaledImageSize.height));
     [context drawImage:outputImage inRect:destRect fromRect:outputExtent];
 }

@@ -13,15 +13,18 @@
 
 @interface YVSMakeCoverSheet : NSObject
 
-@property (assign) size_t numColumns;
-@property (assign) size_t numRows;
-@property (assign) CGFloat borderSize;
-@property (assign) CGSize thumbnailSize;
-@property (assign) size_t imageIndex;
-@property (strong) NSURL *destinationFolder;
-@property (strong) NSString *baseName;
-@property (assign) BOOL softwareRender;
-
+/**
+ @brief Designated initializer.
+ @param     cols    Number of thumbnail columns.
+ @param     rows    Number of thumbnail rows.
+ @param     borderSize  Border width between thumbnails. In pixels
+ @param     thumbnailSize   Maximum size of thumbnail.
+ @param     destFolder  The folder where the cover sheet images are saved.
+ @param     baseName    The basename of the cover sheet file. Sequence number and extension will be added.
+ @param     softwareRender  Render the CoreImage filter in software, not on the GPU.
+ @param     cgContext   Provide a CGContext for the cover sheet. Can be nil.
+ @param     backgroundColor Draw the background of the cover sheet with this color.
+*/
 -(instancetype)initWithColumns:(size_t)cols
                           rows:(size_t)rows
                     borderSize:(size_t)borderSize
@@ -34,12 +37,14 @@
 
 -(void)dealloc;
 
--(size_t)calculateCoverSheetWidth;
--(size_t)calculateCoverSheetHeight;
-
 -(void)drawToCoverSheetThumbnail:(CGImageRef)image;
 -(void)saveImageFileWithUTI:(CFStringRef)uti;
 
+/**
+ @brief Have all positions in the cover sheet have thumbnails drawn.
+ @discussion Check this after calling drawToCoverSheetThumbnail and if true
+ then you can call the method saveImageFileWithUTI to save the thumbnail.
+*/
 -(BOOL)coverSheetFull;
 
 @end

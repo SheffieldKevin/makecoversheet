@@ -13,19 +13,33 @@
 
 @interface YVSMakeCoverSheet ()
 {
-    /// The CGContext where the images as thumbnails are drawn to. Does CGRetain/Release
     CGContextRef _context;
     CGColorRef _backColor;
 }
 
 @property (strong) CIFilter *ciFilter;
-@property (strong) CIContext *ciContext;
+@property (readonly, strong) CIContext *ciContext;
+@property (readonly, assign) BOOL useCoreImage;
+
+@property (assign) size_t numColumns;
+@property (assign) size_t numRows;
+@property (assign) CGFloat borderSize;
+@property (assign) CGSize thumbnailSize;
+@property (assign) size_t imageIndex;
+@property (strong) NSURL *destinationFolder;
+@property (strong) NSString *baseName;
+@property (assign) BOOL softwareRender;
 
 -(void)setContext:(CGContextRef)context;
 -(CGContextRef)context;
 
 -(void)setBackgroundColor:(CGColorRef)theBackColor;
 -(CGColorRef)backgroundColor;
+
+-(void)resetCIContext;
+
+-(size_t)calculateCoverSheetWidth;
+-(size_t)calculateCoverSheetHeight;
 
 @end
 
@@ -44,6 +58,7 @@
     self = [super init];
     if (self)
     {
+        self->_useCoreImage = YES;
         self.numColumns = cols;
         self.numRows = rows;
         self.borderSize = borderSize;
@@ -53,7 +68,10 @@
         self.softwareRender = softwareRender;
         self.context = context;
         self.backgroundColor = backColor;
-        self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
+        if (self.useCoreImage)
+        {
+            self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
+        }
     }
     return self;
 }
@@ -73,21 +91,31 @@
 {
     if (!self.context)
     {
-        CGColorSpaceRef colorSpace = CGImageGetColorSpace(image);
+        CGColorSpaceRef colorSpace = nil;
+        CGContextRef cgContext = nil;
+
+        // CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGBLinear);
+        CGSize size = CGSizeMake([self calculateCoverSheetWidth],
+                                 [self calculateCoverSheetHeight]);
+        cgContext = CreateCGBitmapContextFromPresetSize(
+//                                            MIAlphaPreMulLastRGB32bpc128bppFloat,
+                                            MIAlphaPreMulFirstRGB8bpc32bppInteger,
+                                            size, colorSpace);
+
+/*
+        colorSpace = CGImageGetColorSpace(image);
         CGBitmapInfo bitmapInfo = (CGBitmapInfo)CGImageGetAlphaInfo(image);
-        CGContextRef cgContext;
         cgContext = CGBitmapContextCreate(NULL,
                                           [self calculateCoverSheetWidth],
                                           [self calculateCoverSheetHeight],
-                                          8, // 32 bits per component.
-                                          0,
-                                          colorSpace,
-                                          bitmapInfo); //|
-                                          //kCGBitmapFloatComponents |
-                                          // kCGBitmapByteOrder32Little);
+                                          8, 0, colorSpace, bitmapInfo);
+*/
         self.context = cgContext;
+        CGColorSpaceRelease(colorSpace);
         CGContextRelease(cgContext);
     }
+
     if ([self coverSheetFull])
     {
         // Draw background with color.
@@ -104,7 +132,8 @@
                                               self.numRows,
                                               self.borderSize,
                                               self.thumbnailSize,
-                                              self.imageIndex);
+                                              self.imageIndex,
+                                              [self calculateCoverSheetHeight]);
     self.imageIndex += 1;
 }
 
@@ -115,23 +144,30 @@
     
     CGContextRelease(self->_context);
     self->_context = CGContextRetain(theContext);
-    if ([self context])
-    {
-        // I shouldn't really be creating the cicontext in the cgcontext assign.
-        NSDictionary *optsDict;
-        optsDict = @{ kCIContextUseSoftwareRenderer : @(self.softwareRender) };
-        self->_ciContext = [CIContext contextWithCGContext:self.context
-                                                   options:optsDict];
-    }
-    else
-    {
-        self->_ciContext = nil;
-    }
+    [self resetCIContext];
 }
 
 -(CGContextRef)context
 {
     return self->_context;
+}
+
+-(void)resetCIContext
+{
+    if (self.useCoreImage)
+    {
+        if (self.context)
+        {
+            NSDictionary *optsDict;
+            optsDict = @{ kCIContextUseSoftwareRenderer : @(self.softwareRender) };
+            self->_ciContext = [CIContext contextWithCGContext:self.context
+                                                       options:optsDict];
+        }
+        else
+        {
+            self->_ciContext = nil;
+        }
+    }
 }
 
 -(void)setBackgroundColor:(CGColorRef)theBackColor

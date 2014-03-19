@@ -20,7 +20,8 @@
  @brief Presets for different types of bitmap and pdf contexts to be created.
  @discussion According to the Quartz 2D Programming Guide: Graphic Contexts.
  the following presets are supported pixel formats.
- */
+*/
+
 extern NSString *const MIAlphaOnly8bpc8bppInteger; // no colour data.
 extern NSString *const MIGray8bpc8bppInteger; // single 8 bit grayscale.
 extern NSString *const MIGray16bpc16bppInteger; // single 16 bit grayscale.
@@ -48,4 +49,5 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
                                               size_t rows,
                                               CGFloat borderSize,
                                               CGSize scaledImageSize,
-                                              size_t imageIndex);
+                                              size_t imageIndex,
+                                              size_t height);
