@@ -17,17 +17,19 @@
     CGColorRef _backColor;
 }
 
-@property (strong) CIFilter *ciFilter;
+@property (strong) CIFilter *ciScaleFilter;
+@property (strong) CIFilter *ciCompositeFilter;
 @property (readonly, strong) CIContext *ciContext;
 
 @property (assign) size_t numColumns;
 @property (assign) size_t numRows;
 @property (assign) CGFloat borderSize;
 @property (assign) CGSize thumbnailSize;
-@property (assign) size_t imageIndex;
+@property (assign) size_t imageCount;
 @property (strong) NSURL *destinationFolder;
 @property (strong) NSString *baseName;
 @property (assign) BOOL softwareRender;
+@property (strong) CIImage *coverSheetCIImage;
 
 -(void)setContext:(CGContextRef)context;
 -(CGContextRef)context;
@@ -66,7 +68,8 @@
         self.softwareRender = softwareRender;
         self.context = context;
         self.backgroundColor = backColor;
-        self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
+        self.ciScaleFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
+        self.ciCompositeFilter = [CIFilter filterWithName:@"CISourceOverCompositing"];
     }
     return self;
 }
@@ -79,10 +82,10 @@
 
 -(BOOL)coverSheetFull
 {
-    return ((self.imageIndex % (self.numColumns * self.numRows)) == 0);
+    return ((self.imageCount % (self.numColumns * self.numRows)) == 0);
 }
 
--(void)drawToCoverSheetThumbnail:(CGImageRef)image
+-(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(NSUInteger)thumbIdx
 {
     if (!self.context)
     {
@@ -113,23 +116,29 @@
 
     if ([self coverSheetFull])
     {
-        // Draw background with color.
-        CGContextSetFillColorWithColor(self.context, self.backgroundColor);
-        CGRect fillRect = CGRectMake(0.0, 0.0,
-                                     [self calculateCoverSheetWidth],
-                                     [self calculateCoverSheetHeight]);
-        CGContextFillRect(self.context, fillRect);
+        // initialize coverSheetCIImage for a new cover sheet
+        self.coverSheetCIImage = [CIImage imageWithColor:[CIColor colorWithCGColor:self.backgroundColor]];
+        CGRect rect = CGRectMake(0.0, 0.0, [self calculateCoverSheetWidth], [self calculateCoverSheetHeight]);
+        self.coverSheetCIImage = [self.coverSheetCIImage imageByCroppingToRect:rect];
     }
-    AddImageToCoverSheetContextUsingCoreImage(image,
-                                              self->_ciFilter,
-                                              self->_ciContext,
+    
+    CIImage *ciImg = GenerateImageForCoverSheetUsingCoreImage(image,
+                                              self->_ciScaleFilter,
                                               self.numColumns,
                                               self.numRows,
                                               self.borderSize,
                                               self.thumbnailSize,
-                                              self.imageIndex,
+                                              thumbIdx,
                                               [self calculateCoverSheetHeight]);
-    self.imageIndex += 1;
+
+    @synchronized(self.coverSheetCIImage) {
+        [self.ciCompositeFilter setDefaults];
+        [self.ciCompositeFilter setValue:ciImg forKey:kCIInputImageKey];
+        [self.ciCompositeFilter setValue:self.coverSheetCIImage forKey:kCIInputBackgroundImageKey];
+        self.coverSheetCIImage = [self.ciCompositeFilter valueForKey:kCIOutputImageKey];
+    }
+    
+    self.imageCount += 1;
 }
 
 -(void)setContext:(CGContextRef)theContext
@@ -196,7 +205,7 @@
         extn = UTTypeCopyPreferredTagWithClass(uti, kUTTagClassFilenameExtension);
         NSString *extension = (NSString *)CFBridgingRelease(extn);
         NSString *numString = [NSString stringWithFormat:@"%.4ld",
-                               (long)(self.imageIndex/(self.numColumns * self.numRows))];
+                               (long)(self.imageCount/(self.numColumns * self.numRows))];
         NSString *fileName = [NSString stringWithFormat:@"%@%@.%@", self.baseName,
                               numString, extension];
         NSURL *fullURL = [self.destinationFolder URLByAppendingPathComponent:fileName
@@ -204,7 +213,8 @@
         CGImageDestinationRef destination = CGImageDestinationCreateWithURL(
                                                     (__bridge CFURLRef)fullURL,
                                                     uti, 1, nil);
-        CGImageRef image = CGBitmapContextCreateImage(self->_context);
+//        CGImageRef image = CGBitmapContextCreateImage(self->_context);
+        CGImageRef image = [self.ciContext createCGImage:self.coverSheetCIImage fromRect:[self.coverSheetCIImage extent]];
         CGImageDestinationAddImage(destination, image, nil);
         CGImageDestinationFinalize(destination);
         CGImageRelease(image);

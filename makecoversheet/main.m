@@ -422,50 +422,65 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		//  Set up a semaphore for the completion handler and progress timer
 		__block NSInteger imageNumber = 0;
 		dispatch_semaphore_t sessionWaitSemaphore = dispatch_semaphore_create( 0 );
-		
-		AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
-		imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
-										  CMTime actualTime,
-										  AVAssetImageGeneratorResult result,
-										  NSError *error)
-		{
-			@autoreleasepool
-			{
-/*
-				NSString *requestedTimeString = (NSString *)CFBridgingRelease(
-                                    CMTimeCopyDescription(NULL, requestedTime));
-				NSString *actualTimeString = (NSString *)CFBridgingRelease(
-                                    CMTimeCopyDescription(NULL, actualTime));
-                NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-*/
-				if (result == AVAssetImageGeneratorSucceeded)
-				{
-                    [coverSheetMaker drawToCoverSheetThumbnail:image];
-                    if ([coverSheetMaker coverSheetFull])
-                    {
-                        [coverSheetMaker saveImageFileWithUTI:
-                         (__bridge CFStringRef)[self exportImageFileType]];
-                    }
-				}
-				if (result == AVAssetImageGeneratorFailed && [self verbose])
-				{
-					NSLog(@"Failed with error: %@", [error localizedDescription]);
-				}
-				
-				if (result == AVAssetImageGeneratorCancelled && [self verbose])
-				{
-					NSLog(@"Canceled");
-					dispatch_semaphore_signal(sessionWaitSemaphore);
-				}
-				imageNumber++;
-				if (imageNumber == numTimes)
-					dispatch_semaphore_signal(sessionWaitSemaphore);
-			}
-		};
-		
-		[imageGenerator generateCGImagesAsynchronouslyForTimes:cmTimesArray
-                                             completionHandler:imageCreatedCompletionHandler];
-		
+//        dispatch_group_t sheetGroup = dispatch_group_create();
+        
+        
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void){
+            NSOperationQueue *sheetQueue = [[NSOperationQueue alloc] init];
+            sheetQueue.maxConcurrentOperationCount = [[NSProcessInfo processInfo] processorCount];
+            
+            // process 25 at a time; need to synchronize drawing thumbnaile to cover sheet
+            int sheets = ceil([cmTimesArray count] / 25.0);
+            for (int sheetIdx = 0; sheetIdx < sheets; sheetIdx++) {
+                NSRange sheetRange = NSMakeRange(sheetIdx*25, 25);
+                if (NSMaxRange(sheetRange) > [cmTimesArray count]) {
+                    sheetRange.length -= NSMaxRange(sheetRange) - [cmTimesArray count];
+                }
+                
+                NSArray *sheetTimes = [cmTimesArray subarrayWithRange:sheetRange];
+                [sheetTimes enumerateObjectsUsingBlock:^(NSValue *timeValue, NSUInteger thumbIdx, BOOL *stop) {
+                    [sheetQueue addOperationWithBlock:^{
+                        CMTime cmTime = [timeValue CMTimeValue];
+                        NSError *error;
+                        AVAssetImageGenerator *frameGrabber = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
+                        [frameGrabber setRequestedTimeToleranceAfter:kCMTimeZero];
+                        [frameGrabber setRequestedTimeToleranceBefore:kCMTimeZero];
+                        
+                        CGImageRef frameRef = [frameGrabber copyCGImageAtTime:cmTime actualTime:NULL error:&error];
+                        if (frameRef) {
+                            @synchronized(coverSheetMaker) {
+                                [coverSheetMaker drawToCoverSheetThumbnail:frameRef atIndex:thumbIdx];
+                            }
+                        }
+                        else if (error && [self verbose]) {
+                            NSLog(@"Failed with error: %@", [error localizedDescription]);
+                        }
+                        else if ([self verbose]) {
+                            NSLog(@"Failed to generate image: no error given");
+                        }
+                        
+                        @synchronized(coverSheetMaker) {
+                            imageNumber++;
+                        }
+                    }];
+                    
+//                    dispatch_group_async(sheetGroup,dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^ {
+//                    });
+                }];
+                
+                // wait for all scheduled thumbnails to be generated
+//                dispatch_group_wait(sheetGroup, DISPATCH_TIME_FOREVER);
+                [sheetQueue waitUntilAllOperationsAreFinished];
+                [coverSheetMaker saveImageFileWithUTI:(__bridge CFStringRef)[self exportImageFileType]];
+                
+            }
+            
+            // all done! no need to wait any more
+            dispatch_semaphore_signal(sessionWaitSemaphore);
+        });
+        
+        
+        
 		do
 		{
 			dispatch_time_t dispatchTime = DISPATCH_TIME_FOREVER;
@@ -473,9 +488,8 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			if ([self showProgress])
 			{
 				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
-				printNSString([NSString stringWithFormat:
-                @"generateCGImagesAsynchronouslyForTimes running  progress=%3.2f%%",
-                               imageNumber*100.0 / numTimes]);
+				printNSString([NSString stringWithFormat:@"running  progress=%3.2f%% (%ld)",
+                               imageNumber*100.0 / numTimes, (long)imageNumber]);
 			}
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}

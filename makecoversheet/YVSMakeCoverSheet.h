@@ -37,7 +37,7 @@
 
 -(void)dealloc;
 
--(void)drawToCoverSheetThumbnail:(CGImageRef)image;
+-(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(NSUInteger)thumbIdx;
 -(void)saveImageFileWithUTI:(CFStringRef)uti;
 
 /**

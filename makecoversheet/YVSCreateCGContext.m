@@ -236,3 +236,38 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
     destRect.origin.y = height - ((1 + rowIndex) * (borderSize + scaledImageSize.height));
     [context drawImage:outputImage inRect:destRect fromRect:outputExtent];
 }
+
+
+CIImage * GenerateImageForCoverSheetUsingCoreImage(CGImageRef image,
+                                              CIFilter *scaleFilter,
+                                              size_t columns,
+                                              size_t rows,
+                                              CGFloat borderSize,
+                                              CGSize scaledImageSize,
+                                              size_t imageIndex,
+                                              size_t height)
+{
+    // Assumes up and to the right is positive and bottom left corner is at 0,0
+    size_t localIndex = imageIndex % (columns * rows);
+    CIImage *ciImage = [[CIImage alloc] initWithCGImage:image];
+    [scaleFilter setDefaults];
+    [scaleFilter setValue:ciImage forKey:@"inputImage"];
+    size_t imageWidth = CGImageGetWidth(image);
+    size_t imageHeight = CGImageGetHeight(image);
+    CGFloat scale, scalex, scaley;
+    scalex = scaledImageSize.width / imageWidth;
+    scaley = scaledImageSize.height / imageHeight;
+    scale = fmin(scalex, scaley);
+    [scaleFilter setValue:@(scale) forKey:@"inputScale"];
+    CIImage *outputImage = [scaleFilter valueForKey:@"outputImage"];
+    
+    CGPoint dest;
+    size_t rowIndex = localIndex / columns;
+    size_t columnIndex = localIndex % columns;
+    dest.x = (1 + columnIndex) * borderSize + columnIndex * scaledImageSize.width;
+    dest.y = height - ((1 + rowIndex) * (borderSize + scaledImageSize.height));
+    
+    CGAffineTransform transform = CGAffineTransformTranslate(CGAffineTransformIdentity, dest.x, dest.y);
+    CIImage *finalImage = [outputImage imageByApplyingTransform:transform];
+    return finalImage;
+}

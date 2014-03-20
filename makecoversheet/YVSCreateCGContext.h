@@ -10,6 +10,7 @@
 
 @class CIFilter;
 @class CIContext;
+@class CIImage;
 
 /*
  Define the presets for the colorspace/bit depth/alpha channel combos
@@ -51,3 +52,12 @@ void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
                                               CGSize scaledImageSize,
                                               size_t imageIndex,
                                               size_t height);
+
+CIImage * GenerateImageForCoverSheetUsingCoreImage(CGImageRef image,
+                                                   CIFilter *scaleFilter,
+                                                   size_t columns,
+                                                   size_t rows,
+                                                   CGFloat borderSize,
+                                                   CGSize scaledImageSize,
+                                                   size_t imageIndex,
+                                                   size_t height);
