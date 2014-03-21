@@ -329,8 +329,8 @@ static NSString *_utiType;
                              atTimes:(NSArray *)times
                      coverSheetIndex:(size_t)index
 {
-    dispatch_async(sharedSerialQueue, ^
-    {
+    //    dispatch_async(sharedSerialQueue, ^
+    //{
         YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
         size_t numberOfFrameTimes = [times count];
         AVAssetImageGenerator *imageGenerator;
@@ -354,7 +354,7 @@ static NSString *_utiType;
                     // NSString *actualTimeString = (NSString *)CFBridgingRelease(
                     //                  CMTimeCopyDescription(NULL, actualTime));
                     // NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-                    dispatch_async(coverSheet.serialQueue, ^
+                    dispatch_sync(coverSheet.serialQueue, ^
                     {
                         [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
                         CGImageRelease(image);
@@ -377,7 +377,7 @@ static NSString *_utiType;
         [imageGenerator generateCGImagesAsynchronouslyForTimes:times
                                 completionHandler:imageCreatedCompletionHandler];
         
-    });
+    //    });
 }
 
 +(dispatch_queue_t)createSerialQueue

@@ -429,7 +429,8 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
         size_t numThumbnailsPerSheet = cols * rows;
         size_t numSheets = ceil(numTimes / (1.0 * numThumbnailsPerSheet));
         dispatch_semaphore_t sessionWaitSemaphore = dispatch_semaphore_create(0);
-        
+        NSOperationQueue *sheetQueue = [NSOperationQueue new];
+        sheetQueue.maxConcurrentOperationCount = [[NSProcessInfo processInfo] processorCount];
         for (int sheetIdx = 0 ; sheetIdx < numSheets ; sheetIdx++)
         {
             NSRange sheetRange = NSMakeRange(sheetIdx*numThumbnailsPerSheet,
@@ -439,10 +440,13 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
                 sheetRange.length -= NSMaxRange(sheetRange) - numTimes;
             }
             NSArray *sheetTimes = [cmTimesArray subarrayWithRange:sheetRange];
-            [YVSMakeCoverSheet makeCoverSheetFromSourceAsset:sourceAsset
-                                             finishSemaphore:sessionWaitSemaphore
-                                                     atTimes:sheetTimes
-                                             coverSheetIndex:sheetIdx];
+            [sheetQueue addOperationWithBlock:^
+            {
+                [YVSMakeCoverSheet makeCoverSheetFromSourceAsset:sourceAsset
+                                                 finishSemaphore:sessionWaitSemaphore
+                                                         atTimes:sheetTimes
+                                                 coverSheetIndex:sheetIdx];
+            }];
         }
 
         size_t currentSheet = 0;
