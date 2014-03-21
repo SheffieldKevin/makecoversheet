@@ -9,12 +9,11 @@
 #import "YVSCreateCGContext.h"
 #import "YVSMakeCoverSheet.h"
 
+@import AVFoundation;
+@import QuartzCore; // Don't bother excluding if we're not using CoreImage.
+
 #define USE_COREIMAGE 0
 #define USE_GLOBAL_CONCURRENT_QUEUE 1
-
-#if USE_COREIMAGE
-@import QuartzCore;
-#endif
 
 #pragma mark Private Interface for YVSMakeCoverSheet
 
@@ -311,23 +310,78 @@ static NSString *_utiType;
         size_t thumbIndex = maker.imageIndex;
 #if USE_GLOBAL_CONCURRENT_QUEUE
         dispatch_async(sharedConcurrentQueue, ^
-#else
-        dispatch_async(maker.serialQueue, ^
-#endif
         {
             [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
             CGImageRelease(image);
         });
+#else
+        dispatch_async(maker.serialQueue, ^
+        {
+           [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
+           CGImageRelease(image);
+        });
+#endif
         maker.imageIndex++;
         if (maker.imageIndex == self.numRows * self.numColumns)
             self.currentCoverSheetMaker = nil;
     }
 }
 
++(void)makeCoverSheetFromSourceAsset:(AVAsset *)sourceAsset
+                     finishSemaphore:(dispatch_semaphore_t)finishSemaphore
+                             atTimes:(NSArray *)times
+                     coverSheetIndex:(size_t)index
+{
+    YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
+    size_t numberOfFrameTimes = [times count];
+    AVAssetImageGenerator *imageGenerator;
+    imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
+    
+    AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
+    imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
+                                      CMTime actualTime,
+                                      AVAssetImageGeneratorResult result,
+                                      NSError *error)
+    {
+        @autoreleasepool
+        {
+            if (result == AVAssetImageGeneratorSucceeded)
+            {
+                size_t thumbIndex = coverSheet.imageIndex;
+                CGImageRetain(image);
+                dispatch_async(coverSheet.serialQueue, ^
+                {
+                    [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
+                    CGImageRelease(image);
+                    if (coverSheet.imagesProcessed == numberOfFrameTimes)
+                    {
+                        [coverSheet saveImageFile];
+                        dispatch_semaphore_signal(finishSemaphore);
+                    }
+                });
+                coverSheet.imageIndex++;
+            }
+            if (result == AVAssetImageGeneratorCancelled)
+            {
+                NSLog(@"Canceled");
+                dispatch_semaphore_signal(finishSemaphore);
+            }
+        }
+    };
+    
+    dispatch_async(sharedConcurrentQueue, ^
+    {
+        [imageGenerator generateCGImagesAsynchronouslyForTimes:times
+                                completionHandler:imageCreatedCompletionHandler];
+        
+    });
+}
+
 +(dispatch_queue_t)createConcurrentQueue
 {
     dispatch_queue_t myQueue;
-    myQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    // myQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    myQueue = dispatch_queue_create("com.yvs.sharedserialqueue", DISPATCH_QUEUE_SERIAL);
     return myQueue;
 }
 

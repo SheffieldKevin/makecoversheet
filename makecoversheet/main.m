@@ -320,6 +320,7 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 	return nil;
 }
 
+/*
 static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 {
 	long long milliseconds = seconds * 1000.0;
@@ -327,6 +328,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 	waitTime = dispatch_time(DISPATCH_TIME_NOW, 1000000LL * milliseconds);
 	return waitTime;
 }
+*/
 
 - (int)run
 {
@@ -418,57 +420,41 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			return NO;
 		
 		NSInteger numTimes = [cmTimesArray count];
-		//  Set up a semaphore for the completion handler and progress timer
-		__block NSInteger imageNumber = 0;
-		dispatch_semaphore_t sessionWaitSemaphore = dispatch_semaphore_create( 0 );
-		
-		AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
-		imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
-										  CMTime actualTime,
-										  AVAssetImageGeneratorResult result,
-										  NSError *error)
-		{
-			@autoreleasepool
-			{
-				if (result == AVAssetImageGeneratorSucceeded)
-				{
-                    [YVSMakeCoverSheet drawImageToCoverSheetAsThumbnail:image];
-				}
-				if (result == AVAssetImageGeneratorFailed && [self verbose])
-				{
-					NSLog(@"Failed with error: %@", [error localizedDescription]);
-				}
-				
-				if (result == AVAssetImageGeneratorCancelled && [self verbose])
-				{
-					NSLog(@"Canceled");
-					dispatch_semaphore_signal(sessionWaitSemaphore);
-				}
-				imageNumber++;
-				if (imageNumber == numTimes)
-					dispatch_semaphore_signal(sessionWaitSemaphore);
-			}
-		};
-		
-		[imageGenerator generateCGImagesAsynchronouslyForTimes:cmTimesArray
-                                completionHandler:imageCreatedCompletionHandler];
-		
+        size_t numThumbnailsPerSheet = cols * rows;
+        size_t numSheets = ceil(numTimes / (1.0 * numThumbnailsPerSheet));
+        dispatch_semaphore_t sessionWaitSemaphore = dispatch_semaphore_create(0);
+        
+        for (int sheetIdx = 0 ; sheetIdx < numSheets ; sheetIdx++)
+        {
+            NSRange sheetRange = NSMakeRange(sheetIdx*numThumbnailsPerSheet,
+                                             numThumbnailsPerSheet);
+            if (NSMaxRange(sheetRange) > numTimes)
+            {
+                sheetRange.length -= NSMaxRange(sheetRange) - numTimes;
+            }
+            NSArray *sheetTimes = [cmTimesArray subarrayWithRange:sheetRange];
+            [YVSMakeCoverSheet makeCoverSheetFromSourceAsset:sourceAsset
+                                             finishSemaphore:sessionWaitSemaphore
+                                                     atTimes:sheetTimes
+                                             coverSheetIndex:sheetIdx];
+        }
+
+        size_t currentSheet = 0;
 		do
 		{
 			dispatch_time_t dispatchTime = DISPATCH_TIME_FOREVER;
 			// if we dont want progress, we will wait until it finishes.
 			if ([self showProgress])
 			{
-				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
+                //				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
 				printNSString([NSString stringWithFormat:
-                @"running progress=%3.2f%% imageNumber: %ld",
-                               imageNumber*100.0 / numTimes, (long)imageNumber]);
+                @"running progress=%3.2f%% Sheet number: %ld",
+                               currentSheet*100.0 / numSheets, (long)currentSheet]);
 			}
+            currentSheet++;
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
-		while( imageNumber < numTimes );
-		
-        [YVSMakeCoverSheet finalize];
+		while( currentSheet < numSheets );
         
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");

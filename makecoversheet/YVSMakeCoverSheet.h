@@ -8,6 +8,8 @@
 
 @import Foundation;
 
+@class AVAsset;
+
 @interface YVSMakeCoverSheet : NSObject
 
 /**
@@ -37,6 +39,11 @@
  should save itself to disk.
 */
 +(void)drawImageToCoverSheetAsThumbnail:(CGImageRef)image;
+
++(void)makeCoverSheetFromSourceAsset:(AVAsset *)sourceAsset
+                     finishSemaphore:(dispatch_semaphore_t)finishSemaphore
+                             atTimes:(NSArray *)times
+                     coverSheetIndex:(size_t)index;
 
 +(void)finalize;
 
