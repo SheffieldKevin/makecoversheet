@@ -43,11 +43,3 @@ CGContextRef CreateCGBitmapContextFromPresetSize(NSString *preset,
                                                  CGSize size,
                                                  CGColorSpaceRef colorSpace);
 
-void AddImageToCoverSheetContext(CGImageRef image,
-                                 YVSMakeCoverSheet *caller,
-                                 size_t columns,
-                                 size_t rows,
-                                 CGFloat borderSize,
-                                 CGSize scaledImageSize,
-                                 size_t imageIndex,
-                                 size_t height);

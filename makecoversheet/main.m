@@ -461,8 +461,8 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			{
 				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
 				printNSString([NSString stringWithFormat:
-                @"running  progress=%3.2f%%",
-                               imageNumber*100.0 / numTimes]);
+                @"running progress=%3.2f%% imageNumber: %ld",
+                               imageNumber*100.0 / numTimes, (long)imageNumber]);
 			}
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
