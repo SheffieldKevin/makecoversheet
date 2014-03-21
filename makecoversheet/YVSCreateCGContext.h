@@ -10,6 +10,7 @@
 
 @class CIFilter;
 @class CIContext;
+@class YVSMakeCoverSheet;
 
 /*
  Define the presets for the colorspace/bit depth/alpha channel combos
@@ -42,12 +43,11 @@ CGContextRef CreateCGBitmapContextFromPresetSize(NSString *preset,
                                                  CGSize size,
                                                  CGColorSpaceRef colorSpace);
 
-void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
-                                              CIFilter *scaleFilter,
-                                              CIContext *context,
-                                              size_t columns,
-                                              size_t rows,
-                                              CGFloat borderSize,
-                                              CGSize scaledImageSize,
-                                              size_t imageIndex,
-                                              size_t height);
+void AddImageToCoverSheetContext(CGImageRef image,
+                                 YVSMakeCoverSheet *caller,
+                                 size_t columns,
+                                 size_t rows,
+                                 CGFloat borderSize,
+                                 CGSize scaledImageSize,
+                                 size_t imageIndex,
+                                 size_t height);

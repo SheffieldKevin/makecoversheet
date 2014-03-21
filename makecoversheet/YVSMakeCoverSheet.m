@@ -9,64 +9,356 @@
 #import "YVSCreateCGContext.h"
 #import "YVSMakeCoverSheet.h"
 
+#define USE_COREIMAGE 0
+#define USE_GLOBAL_CONCURRENT_QUEUE 1
+
+#if USE_COREIMAGE
 @import QuartzCore;
+#endif
+
+#pragma mark Private Interface for YVSMakeCoverSheet
 
 @interface YVSMakeCoverSheet ()
 {
     CGContextRef _context;
-    CGColorRef _backColor;
 }
 
-@property (strong) CIFilter *ciFilter;
-@property (readonly, strong) CIContext *ciContext;
-
-@property (assign) size_t numColumns;
-@property (assign) size_t numRows;
-@property (assign) CGFloat borderSize;
-@property (assign) CGSize thumbnailSize;
 @property (assign) size_t imageIndex;
-@property (strong) NSURL *destinationFolder;
-@property (strong) NSString *baseName;
-@property (assign) BOOL softwareRender;
+@property (assign) size_t imagesProcessed;
+@property (assign) BOOL   saveOnPartialCoverSheet;
+@property (readonly, assign) size_t coverSheetIndex;
+@property (strong) dispatch_queue_t serialQueue;
+
+#if USE_COREIMAGE
+@property (strong) CIContext *ciContext;
+@property (strong) CIFilter *ciFilter;
+#endif
+
+#pragma mark Private Class Interface
+
++(size_t)numColumns;
++(void)setNumColumns:(size_t)theNumColumns;
+
++(size_t)numRows;
++(void)setNumRows:(size_t)theNumRows;
+
++(CGFloat)borderSize;
++(void)setBorderSize:(CGFloat)theBorderSize;
+
++(CGSize)thumbnailSize;
++(void)setThumbnailSize:(CGSize)theThumbnailSize;
+
+// synchronized with class self as the cover sheet index will be changing.
++(size_t)coverSheetIndex;
++(void)setCoverSheetIndex:(size_t)theCoverSheetIndex;
+
++(NSURL *)destinationFolder;
++(void)setDestinationFolder:(NSURL *)theDestFolder;
+
++(NSString *)baseName;
++(void)setBaseName:(NSString *)theBaseName;
+
++(CGColorRef)backColor;
++(void)setBackColor:(CGColorRef)theBackgroundColor;
+
++(NSString *)utiType;
++(void)setUtiType:(NSString *)theUtiType;
+
++(size_t)coverSheetWidth;
++(void)setCoverSheetWidth:(size_t)theCoverSheetWidth;
+
++(size_t)coverSheetHeight;
++(void)setCoverSheetHeight:(size_t)theCoverSheetHeight;
+
+/**
+ The current cover sheet maker is the one which we are sending images to, which
+ are to be added to the cover sheet. There may be others that are still processing
+ the images that have been sent to them to add to their cover sheet. To stop ARC
+ deallocating these cover sheets I've got a list of currently processing cover
+ sheet makers where the cover sheet maker will remove itself from the list when
+ it's finished working. This list may not be necessary as the blocks that are
+ doing the work are probably holding onto the cover sheet maker already.
+ 
+ synchronized with class slef as the current cover sheet will be changing.
+*/
++(YVSMakeCoverSheet *)currentCoverSheetMaker;
++(void)setCurrentCoverSheetMaker:(YVSMakeCoverSheet *)theCoverSheetMaker;
+
+// Currently implementing a single concurrent queue for all YVSMakeCoverSheet
+// objects. Can try later to see if giving each YVSMakeCoverSheet object its
+// own concurrent queue to do the work. Could even try providing each
+// YVSMakeCoverSheet object a serial queue instead. This way if multiple queues
+// will only be in operation if the images are being provided faster than they
+// are being processed on one queue. That could be nicely self regulating.
++(dispatch_queue_t)createConcurrentQueue;
+
+#pragma mark Private Interface
 
 -(void)setContext:(CGContextRef)context;
--(CGContextRef)context;
 
--(void)setBackgroundColor:(CGColorRef)theBackColor;
--(CGColorRef)backgroundColor;
+-(void)saveImageFile;
+-(void)saveIfReady;
 
--(void)resetCIContext;
+-(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(size_t)index;
 
--(size_t)calculateCoverSheetWidth;
--(size_t)calculateCoverSheetHeight;
+/**
+ @brief Have all positions in the cover sheet have thumbnails drawn.
+ @discussion Check this after calling drawToCoverSheetThumbnail and if true
+ then you can call the method saveImageFile to save the thumbnail.
+*/
+-(BOOL)coverSheetFull;
 
 @end
 
+#pragma mark - YVSMakeCoverSheet Implementation
+
 @implementation YVSMakeCoverSheet
 
--(instancetype)initWithColumns:(size_t)cols
-                          rows:(size_t)rows
-                    borderSize:(size_t)borderSize
-                thumbmnailSize:(CGSize)thumbnailSize
-                    destFolder:(NSURL *)destFolder
-                      baseName:(NSString *)baseName
-                softwareRender:(BOOL)softwareRender
-                     cgContext:(CGContextRef)context
-               backgroundColor:(CGColorRef)backColor
+#pragma mark Class members
+
+// A concurrent queue shared between all YVSMakeCoverSheet objects.
+static dispatch_queue_t sharedConcurrentQueue;
+
+// Do not access the following directly. Use accessors.
+//====================================================================
+static size_t _numColumns;
+static size_t _numRows;
+static CGFloat _borderSize;
+static size_t _coverSheetWidth;
+static size_t _coverSheetHeight;
+static CGSize _thumbnailSize;
+static size_t _coverSheetIndex;
+static NSURL *_destinationFolder;
+static NSString *_baseName;
+static CGColorRef _backgroundColor;
+static YVSMakeCoverSheet *_currentCoverSheetMaker;
+static NSString *_utiType;
+//====================================================================
+// Do not access the above directly. Use the accessors implemented below.
+
+#pragma mark Private Class Methods implementation
+
++(size_t)numColumns
+{
+    return _numColumns;
+}
+
++(void)setNumColumns:(size_t)theNumColumns
+{
+    _numColumns = theNumColumns;
+}
+
++(size_t)numRows
+{
+    return _numRows;
+}
+
++(void)setNumRows:(size_t)theNumRows
+{
+    _numRows = theNumRows;
+}
+
++(CGFloat)borderSize
+{
+    return _borderSize;
+}
+
++(void)setBorderSize:(CGFloat)theBorderSize
+{
+    _borderSize = theBorderSize;
+}
+
++(CGSize)thumbnailSize
+{
+    return _thumbnailSize;
+}
+
++(void)setThumbnailSize:(CGSize)theThumbnailSize
+{
+    _thumbnailSize = theThumbnailSize;
+}
+
++(size_t)coverSheetIndex
+{
+    return _coverSheetIndex;
+}
+
++(void)setCoverSheetIndex:(size_t)theCoverSheetIndex
+{
+    _coverSheetIndex = theCoverSheetIndex;
+}
+
++(YVSMakeCoverSheet *)currentCoverSheetMaker
+{
+    return _currentCoverSheetMaker;
+}
+
++(void)setCurrentCoverSheetMaker:(YVSMakeCoverSheet *)theCoverSheetMaker
+{
+    _currentCoverSheetMaker = theCoverSheetMaker;
+}
+
++(NSURL *)destinationFolder
+{
+    return _destinationFolder;
+}
+
++(void)setDestinationFolder:(NSURL *)theDestFolder
+{
+    _destinationFolder = theDestFolder;
+}
+
++(NSString *)baseName
+{
+    return _baseName;
+}
+
++(void)setBaseName:(NSString *)theBaseName
+{
+    _baseName = theBaseName;
+}
+
++(CGColorRef)backColor
+{
+    return _backgroundColor;
+}
+
++(void)setBackColor:(CGColorRef)theBackgroundColor
+{
+    if (theBackgroundColor == _backgroundColor)
+        return;
+    
+    CGColorRelease(_backgroundColor);
+    _backgroundColor = CGColorRetain(theBackgroundColor);
+}
+
++(NSString *)utiType
+{
+    return _utiType;
+}
+
++(void)setUtiType:(NSString *)theUtiType
+{
+    _utiType = theUtiType;
+}
+
++(size_t)coverSheetWidth
+{
+    return _coverSheetWidth;
+}
+
++(void)setCoverSheetWidth:(size_t)theCoverSheetWidth
+{
+    _coverSheetWidth = theCoverSheetWidth;
+}
+
++(size_t)coverSheetHeight
+{
+    return _coverSheetHeight;
+}
+
++(void)setCoverSheetHeight:(size_t)theCoverSheetHeight
+{
+    _coverSheetHeight = theCoverSheetHeight;
+}
+
+#pragma mark Public Class Methods implementation
+
++(void)initialize
+{
+    if (self == [YVSMakeCoverSheet class])
+    {
+        sharedConcurrentQueue = [self createConcurrentQueue];
+    }
+}
+
++(void)coverSheetInitializersWithColumns:(size_t)cols
+                                    rows:(size_t)rows
+                              borderSize:(size_t)borderSize
+                           thumbnailSize:(CGSize)thumbnailSize
+                              destFolder:(NSURL *)destFolder
+                                baseName:(NSString *)baseName
+                         backgroundColor:(CGColorRef)backColor
+                                 utiType:(NSString *)theUtiType
+{
+    self.numColumns = cols;
+    self.numRows = rows;
+    self.borderSize = borderSize;
+    self.thumbnailSize = thumbnailSize;
+    self.coverSheetWidth = (1 + cols) * borderSize + cols * thumbnailSize.width;
+    self.coverSheetHeight = (1 + rows) * borderSize + rows * thumbnailSize.height;
+    self.destinationFolder = destFolder;
+    self.baseName = baseName;
+    self.backColor = backColor;
+    self.utiType = theUtiType;
+}
+
++(void)drawImageToCoverSheetAsThumbnail:(CGImageRef)image
+{
+    // The AVAsset image generator with handler release the image when the
+    // handler returns. Before adding the image to the queue with dispatch
+    // async we need to retain the image. But that means once we've drawn it
+    // we need to release it.
+    CGImageRetain(image);
+    @synchronized(self)
+    {
+        YVSMakeCoverSheet *maker = self.currentCoverSheetMaker;
+        if (maker == nil)
+        {
+            maker = [[self alloc] initWithCoverSheetIndex:self.coverSheetIndex++];
+            self.currentCoverSheetMaker = maker;
+        }
+        size_t thumbIndex = maker.imageIndex;
+#if USE_GLOBAL_CONCURRENT_QUEUE
+        dispatch_async(sharedConcurrentQueue, ^
+#else
+        dispatch_async(maker.serialQueue, ^
+#endif
+        {
+            [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
+            CGImageRelease(image);
+        });
+        maker.imageIndex++;
+        if (maker.imageIndex == self.numRows * self.numColumns)
+            self.currentCoverSheetMaker = nil;
+    }
+}
+
++(dispatch_queue_t)createConcurrentQueue
+{
+    dispatch_queue_t myQueue;
+    myQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    return myQueue;
+}
+
+// Called when we've finished. This should be called on the last cover sheet
+// so that a part finished cover sheet can be saved when there are no more images
+// to be added.
++(void)finalize
+{
+    @synchronized(self)
+    {
+        if (self.currentCoverSheetMaker)
+        {
+            // Might need a mechanim to wait to save
+            self.currentCoverSheetMaker.saveOnPartialCoverSheet = YES;
+            self.currentCoverSheetMaker = nil;
+        }
+    }
+}
+
+#pragma mark Private class initializer.
+
+-(instancetype)initWithCoverSheetIndex:(size_t)coverSheetIndex
 {
     self = [super init];
     if (self)
     {
-        self.numColumns = cols;
-        self.numRows = rows;
-        self.borderSize = borderSize;
-        self.thumbnailSize = thumbnailSize;
-        self.destinationFolder = destFolder;
-        self.baseName = baseName;
-        self.softwareRender = softwareRender;
-        self.context = context;
-        self.backgroundColor = backColor;
+        self->_coverSheetIndex = coverSheetIndex;
+        self.serialQueue = dispatch_queue_create("com.yvsmakecoversheet", DISPATCH_QUEUE_SERIAL);
+#if USE_COREIMAGE
         self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
+#endif
     }
     return self;
 }
@@ -74,15 +366,15 @@
 -(void)dealloc
 {
     self.context = nil;
-    self.backgroundColor = nil;
 }
 
 -(BOOL)coverSheetFull
 {
-    return ((self.imageIndex % (self.numColumns * self.numRows)) == 0);
+    return ((self.imageIndex % (YVSMakeCoverSheet.numColumns *
+                                YVSMakeCoverSheet.numRows)) == 0);
 }
 
--(void)drawToCoverSheetThumbnail:(CGImageRef)image
+-(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(size_t)index
 {
     if (!self.context)
     {
@@ -91,45 +383,58 @@
 
         // CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
         colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGBLinear);
-        CGSize size = CGSizeMake([self calculateCoverSheetWidth],
-                                 [self calculateCoverSheetHeight]);
+        CGSize size = CGSizeMake(YVSMakeCoverSheet.coverSheetWidth,
+                                 YVSMakeCoverSheet.coverSheetHeight);
         cgContext = CreateCGBitmapContextFromPresetSize(
-//                                            MIAlphaPreMulLastRGB32bpc128bppFloat,
                                             MIAlphaPreMulFirstRGB8bpc32bppInteger,
                                             size, colorSpace);
 
-/*
-        colorSpace = CGImageGetColorSpace(image);
-        CGBitmapInfo bitmapInfo = (CGBitmapInfo)CGImageGetAlphaInfo(image);
-        cgContext = CGBitmapContextCreate(NULL,
-                                          [self calculateCoverSheetWidth],
-                                          [self calculateCoverSheetHeight],
-                                          8, 0, colorSpace, bitmapInfo);
-*/
         self.context = cgContext;
         CGColorSpaceRelease(colorSpace);
         CGContextRelease(cgContext);
+        // Draw background with color.
+        CGContextSetFillColorWithColor(self.context, YVSMakeCoverSheet.backColor);
+        CGRect fillRect = CGRectMake(0.0, 0.0,
+                                     YVSMakeCoverSheet.coverSheetWidth,
+                                     YVSMakeCoverSheet.coverSheetHeight);
+        CGContextFillRect(self.context, fillRect);
+#if USE_COREIMAGE
+        self.ciContext = [CIContext contextWithCGContext:cgContext options:nil];
+#endif
     }
 
-    if ([self coverSheetFull])
+    size_t imageWidth = CGImageGetWidth(image);
+    size_t imageHeight = CGImageGetHeight(image);
+    CGFloat scale, scalex, scaley;
+    scalex = YVSMakeCoverSheet.thumbnailSize.width / imageWidth;
+    scaley = YVSMakeCoverSheet.thumbnailSize.height / imageHeight;
+    scale = fmin(scalex, scaley);
+    
+    CGRect destRect;
+    destRect.size.width = imageWidth * scale;
+    destRect.size.height = imageHeight * scale;
+    size_t rowIndex = index / YVSMakeCoverSheet.numColumns;
+    size_t columnIndex = index % YVSMakeCoverSheet.numColumns;
+    destRect.origin.x = (1 + columnIndex) * YVSMakeCoverSheet.borderSize +
+                    columnIndex * YVSMakeCoverSheet.thumbnailSize.width;
+    destRect.origin.y = YVSMakeCoverSheet.coverSheetHeight - ((1 + rowIndex) *
+                                  (YVSMakeCoverSheet.borderSize +
+                                   YVSMakeCoverSheet.thumbnailSize.height));
+#if USE_COREIMAGE
+    [self.ciFilter setDefaults];
+    [self.ciFilter setValue:[CIImage imageWithCGImage:image] forKey:@"inputImage"];
+    [self.ciFilter setValue:@(scale) forKey:@"inputScale"];
+    CIImage *outImage = [self.ciFilter valueForKey:@"outputImage"];
+    [self.ciContext drawImage:outImage inRect:destRect fromRect:[outImage extent]];
+#else
+    CGContextDrawImage(self.context, destRect, image);
+#endif
+    
+    @synchronized(self)
     {
-        // Draw background with color.
-        CGContextSetFillColorWithColor(self.context, self.backgroundColor);
-        CGRect fillRect = CGRectMake(0.0, 0.0,
-                                     [self calculateCoverSheetWidth],
-                                     [self calculateCoverSheetHeight]);
-        CGContextFillRect(self.context, fillRect);
+        self.imagesProcessed += 1;
     }
-    AddImageToCoverSheetContextUsingCoreImage(image,
-                                              self->_ciFilter,
-                                              self->_ciContext,
-                                              self.numColumns,
-                                              self.numRows,
-                                              self.borderSize,
-                                              self.thumbnailSize,
-                                              self.imageIndex,
-                                              [self calculateCoverSheetHeight]);
-    self.imageIndex += 1;
+    [self saveIfReady];
 }
 
 -(void)setContext:(CGContextRef)theContext
@@ -139,7 +444,6 @@
     
     CGContextRelease(self->_context);
     self->_context = CGContextRetain(theContext);
-    [self resetCIContext];
 }
 
 -(CGContextRef)context
@@ -147,68 +451,42 @@
     return self->_context;
 }
 
--(void)resetCIContext
+-(void)saveIfReady
 {
-    if (self.context)
+    size_t maxImageNum = YVSMakeCoverSheet.numRows * YVSMakeCoverSheet.numColumns;
+    @synchronized(self)
     {
-        NSDictionary *optsDict;
-        optsDict = @{ kCIContextUseSoftwareRenderer : @(self.softwareRender) };
-        self->_ciContext = [CIContext contextWithCGContext:self.context
-                                                   options:optsDict];
-    }
-    else
-    {
-        self->_ciContext = nil;
+        if (self.imagesProcessed >= maxImageNum ||
+                (self.saveOnPartialCoverSheet &&
+                 (self.imagesProcessed == self.imageIndex)))
+        {
+            [self saveImageFile];
+        }
     }
 }
 
--(void)setBackgroundColor:(CGColorRef)theBackColor
+-(void)saveImageFile
 {
-    if (theBackColor == self->_backColor)
-        return;
-    
-    CGColorRelease(self->_backColor);
-    self->_backColor = CGColorRetain(theBackColor);
-}
-
--(CGColorRef)backgroundColor
-{
-    return self->_backColor;
-}
-
--(size_t)calculateCoverSheetWidth
-{
-    size_t numCols = self.numColumns;
-    return (1 + numCols) * self.borderSize + numCols * self.thumbnailSize.width;
-}
-
--(size_t)calculateCoverSheetHeight
-{
-    size_t numRows = self.numRows;
-    return (1 + numRows) * self.borderSize + numRows * self.thumbnailSize.height;
-}
-
--(void)saveImageFileWithUTI:(CFStringRef)uti
-{
-    if (self.baseName && self.destinationFolder)
+    CFStringRef uti = (__bridge CFStringRef)YVSMakeCoverSheet.utiType;
+    if (YVSMakeCoverSheet.baseName && YVSMakeCoverSheet.destinationFolder)
     {
         CFStringRef extn;
         extn = UTTypeCopyPreferredTagWithClass(uti, kUTTagClassFilenameExtension);
         NSString *extension = (NSString *)CFBridgingRelease(extn);
         NSString *numString = [NSString stringWithFormat:@"%.4ld",
-                               (long)(self.imageIndex/(self.numColumns * self.numRows))];
-        NSString *fileName = [NSString stringWithFormat:@"%@%@.%@", self.baseName,
-                              numString, extension];
-        NSURL *fullURL = [self.destinationFolder URLByAppendingPathComponent:fileName
-                                                                 isDirectory:NO];
-        CGImageDestinationRef destination = CGImageDestinationCreateWithURL(
-                                                    (__bridge CFURLRef)fullURL,
-                                                    uti, 1, nil);
+                                                        self.coverSheetIndex];
+        NSString *fileName = [NSString stringWithFormat:@"%@%@.%@",
+                              YVSMakeCoverSheet.baseName, numString, extension];
+        NSURL *fullURL = [YVSMakeCoverSheet.destinationFolder
+                          URLByAppendingPathComponent:fileName
+                                          isDirectory:NO];
+        CGImageDestinationRef dest;
+        dest = CGImageDestinationCreateWithURL((__bridge CFURLRef)fullURL, uti, 1, nil);
         CGImageRef image = CGBitmapContextCreateImage(self->_context);
-        CGImageDestinationAddImage(destination, image, nil);
-        CGImageDestinationFinalize(destination);
+        CGImageDestinationAddImage(dest, image, nil);
+        CGImageDestinationFinalize(dest);
         CGImageRelease(image);
-        CFRelease(destination);
+        CFRelease(dest);
     }
 }
 

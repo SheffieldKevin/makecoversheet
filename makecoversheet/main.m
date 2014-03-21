@@ -394,7 +394,6 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
     
 	@autoreleasepool
 	{
-        YVSMakeCoverSheet *coverSheetMaker;
         size_t cols = NUM_COLS;
         size_t rows = NUM_ROWS;
         size_t borderSize = BORDER_SIZE; // 10 pixel width bordersize.
@@ -404,15 +403,15 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
                                                    BACKGROUND_GREEN,
                                                    BACKGROUND_BLUE, 1.0);
         NSString *baseName = [self baseFileName];
-        coverSheetMaker = [[YVSMakeCoverSheet alloc] initWithColumns:cols
-                                                                rows:rows
-                                                          borderSize:borderSize
-                                                      thumbmnailSize:thumbnailSize
-                                                          destFolder:destURL
-                                                            baseName:baseName
-                                                      softwareRender:COREIMAGE_SOFTWARERENDER
-                                                           cgContext:nil
-                                                     backgroundColor:color];
+        [YVSMakeCoverSheet coverSheetInitializersWithColumns:cols
+                                                        rows:rows
+                                                  borderSize:borderSize
+                                               thumbnailSize:thumbnailSize
+                                                  destFolder:destURL
+                                                    baseName:baseName
+                                             backgroundColor:color
+                                                     utiType:self.exportImageFileType];
+
         CGColorRelease(color);
 		NSArray *cmTimesArray = [self createListOfTimes:sourceAsset];
 		if (!cmTimesArray || [cmTimesArray count] == 0)
@@ -431,21 +430,9 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		{
 			@autoreleasepool
 			{
-/*
-				NSString *requestedTimeString = (NSString *)CFBridgingRelease(
-                                    CMTimeCopyDescription(NULL, requestedTime));
-				NSString *actualTimeString = (NSString *)CFBridgingRelease(
-                                    CMTimeCopyDescription(NULL, actualTime));
-                NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-*/
 				if (result == AVAssetImageGeneratorSucceeded)
 				{
-                    [coverSheetMaker drawToCoverSheetThumbnail:image];
-                    if ([coverSheetMaker coverSheetFull])
-                    {
-                        [coverSheetMaker saveImageFileWithUTI:
-                         (__bridge CFStringRef)[self exportImageFileType]];
-                    }
+                    [YVSMakeCoverSheet drawImageToCoverSheetAsThumbnail:image];
 				}
 				if (result == AVAssetImageGeneratorFailed && [self verbose])
 				{
@@ -464,7 +451,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		};
 		
 		[imageGenerator generateCGImagesAsynchronouslyForTimes:cmTimesArray
-                                             completionHandler:imageCreatedCompletionHandler];
+                                completionHandler:imageCreatedCompletionHandler];
 		
 		do
 		{
@@ -474,15 +461,14 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			{
 				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
 				printNSString([NSString stringWithFormat:
-                @"generateCGImagesAsynchronouslyForTimes running  progress=%3.2f%%",
+                @"running  progress=%3.2f%%",
                                imageNumber*100.0 / numTimes]);
 			}
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
 		while( imageNumber < numTimes );
 		
-        [coverSheetMaker saveImageFileWithUTI:
-         (__bridge CFStringRef)[self exportImageFileType]];
+        [YVSMakeCoverSheet finalize];
         
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");

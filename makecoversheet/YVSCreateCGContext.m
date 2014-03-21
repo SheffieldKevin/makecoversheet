@@ -6,8 +6,10 @@
 //  Copyright (c) 2014 Kevin Meaney. All rights reserved.
 //
 
-#import "YVSCreateCGContext.h"
 @import QuartzCore;
+
+#import "YVSCreateCGContext.h"
+#import "YVSMakeCoverSheet.h"
 
 NSString *const MIAlphaOnly8bpc8bppInteger = @"AlphaOnly8bpcInt";
 NSString *const MIGray8bpc8bppInteger = @"Gray8bpcInt";
@@ -199,40 +201,36 @@ CGContextRef CreateCGBitmapContextFromPresetSize(NSString *preset,
     return theContext;
 }
 
-void AddImageToCoverSheetContextUsingCoreImage(CGImageRef image,
-                                               CIFilter *scaleFilter,
-                                               CIContext *context,
-                                               size_t columns,
-                                               size_t rows,
-                                               CGFloat borderSize,
-                                               CGSize scaledImageSize,
-                                               size_t imageIndex,
-                                               size_t height)
+void AddImageToCoverSheetContext(CGImageRef image,
+                                 YVSMakeCoverSheet *caller,
+                                 size_t columns,
+                                 size_t rows,
+                                 CGFloat borderSize,
+                                 CGSize scaledImageSize,
+                                 size_t imageIndex,
+                                 size_t height)
 {
     // Assumes context is big enough to draw the image into.
     // Assumes up and to the right is positive and bottom left corner is at 0,0
+    CGImageRetain(image);
     size_t localIndex = imageIndex % (columns * rows);
-    CIImage *ciImage = [[CIImage alloc] initWithCGImage:image];
-    [scaleFilter setDefaults];
-    [scaleFilter setValue:ciImage forKey:@"inputImage"];
     size_t imageWidth = CGImageGetWidth(image);
     size_t imageHeight = CGImageGetHeight(image);
     CGFloat scale, scalex, scaley;
     scalex = scaledImageSize.width / imageWidth;
     scaley = scaledImageSize.height / imageHeight;
     scale = fmin(scalex, scaley);
-    [scaleFilter setValue:@(scale) forKey:@"inputScale"];
-    CIImage *outputImage = [scaleFilter valueForKey:@"outputImage"];
-    CGRect outputExtent = [outputImage extent];
     
     CGRect destRect;
-    // destRect.size = scaledImageSize;
-    destRect.size.width = scale * imageWidth;
-    destRect.size.height = scale * imageHeight;
+    destRect.size = scaledImageSize;
     size_t rowIndex = localIndex / columns;
     size_t columnIndex = localIndex % columns;
     destRect.origin.x = (1 + columnIndex) * borderSize +
                                 columnIndex * scaledImageSize.width;
     destRect.origin.y = height - ((1 + rowIndex) * (borderSize + scaledImageSize.height));
-    [context drawImage:outputImage inRect:destRect fromRect:outputExtent];
+    CGImageRelease(image);
+    dispatch_async(dispatch_get_main_queue(), ^
+    {
+        
+    });
 }
