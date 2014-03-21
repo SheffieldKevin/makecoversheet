@@ -380,9 +380,9 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			return NO;
 		}
         
-		imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
-		[imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
-		[imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
+		// imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
+		// [imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
+		// [imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
 		if ([self verbose])
 		{
 			printNSString([NSString stringWithFormat:

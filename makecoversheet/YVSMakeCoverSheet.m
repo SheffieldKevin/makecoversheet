@@ -13,7 +13,7 @@
 @import QuartzCore; // Don't bother excluding if we're not using CoreImage.
 
 #define USE_COREIMAGE 0
-#define USE_GLOBAL_CONCURRENT_QUEUE 1
+#define USE_SHARED_SERIAL_QUEUE 1
 
 #pragma mark Private Interface for YVSMakeCoverSheet
 
@@ -83,13 +83,10 @@
 +(YVSMakeCoverSheet *)currentCoverSheetMaker;
 +(void)setCurrentCoverSheetMaker:(YVSMakeCoverSheet *)theCoverSheetMaker;
 
-// Currently implementing a single concurrent queue for all YVSMakeCoverSheet
-// objects. Can try later to see if giving each YVSMakeCoverSheet object its
-// own concurrent queue to do the work. Could even try providing each
-// YVSMakeCoverSheet object a serial queue instead. This way if multiple queues
-// will only be in operation if the images are being provided faster than they
-// are being processed on one queue. That could be nicely self regulating.
-+(dispatch_queue_t)createConcurrentQueue;
+// Currently implementing a single serial queue to hand out the
+// work for each YVSMakeCoverSheet object. Each YVSMakeCoverSheet object then
+// creates an interial serial queue for processing the images.
++(dispatch_queue_t)createSerialQueue;
 
 #pragma mark Private Interface
 
@@ -116,7 +113,7 @@
 #pragma mark Class members
 
 // A concurrent queue shared between all YVSMakeCoverSheet objects.
-static dispatch_queue_t sharedConcurrentQueue;
+static dispatch_queue_t sharedSerialQueue;
 
 // Do not access the following directly. Use accessors.
 //====================================================================
@@ -267,7 +264,7 @@ static NSString *_utiType;
 {
     if (self == [YVSMakeCoverSheet class])
     {
-        sharedConcurrentQueue = [self createConcurrentQueue];
+        sharedSerialQueue = [self createSerialQueue];
     }
 }
 
@@ -308,8 +305,8 @@ static NSString *_utiType;
             self.currentCoverSheetMaker = maker;
         }
         size_t thumbIndex = maker.imageIndex;
-#if USE_GLOBAL_CONCURRENT_QUEUE
-        dispatch_async(sharedConcurrentQueue, ^
+#if USE_SHARED_SERIAL_QUEUE
+        dispatch_async(sharedSerialQueue, ^
         {
             [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
             CGImageRelease(image);
@@ -332,56 +329,63 @@ static NSString *_utiType;
                              atTimes:(NSArray *)times
                      coverSheetIndex:(size_t)index
 {
-    YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
-    size_t numberOfFrameTimes = [times count];
-    AVAssetImageGenerator *imageGenerator;
-    imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
-    
-    AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
-    imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
-                                      CMTime actualTime,
-                                      AVAssetImageGeneratorResult result,
-                                      NSError *error)
+    dispatch_async(sharedSerialQueue, ^
     {
-        @autoreleasepool
+        YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
+        size_t numberOfFrameTimes = [times count];
+        AVAssetImageGenerator *imageGenerator;
+        imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
+        [imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
+		[imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
+        AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
+        imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
+                                          CMTime actualTime,
+                                          AVAssetImageGeneratorResult result,
+                                          NSError *error)
         {
-            if (result == AVAssetImageGeneratorSucceeded)
+            @autoreleasepool
             {
-                size_t thumbIndex = coverSheet.imageIndex;
-                CGImageRetain(image);
-                dispatch_async(coverSheet.serialQueue, ^
+                if (result == AVAssetImageGeneratorSucceeded)
                 {
-                    [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
-                    CGImageRelease(image);
-                    if (coverSheet.imagesProcessed == numberOfFrameTimes)
+                    size_t thumbIndex = coverSheet.imageIndex;
+                    CGImageRetain(image);
+                    // NSString *requestedTimeString = (NSString *)CFBridgingRelease(
+                    // CMTimeCopyDescription(NULL, requestedTime));
+                    // NSString *actualTimeString = (NSString *)CFBridgingRelease(
+                    //                  CMTimeCopyDescription(NULL, actualTime));
+                    // NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
+                    dispatch_async(coverSheet.serialQueue, ^
                     {
-                        [coverSheet saveImageFile];
-                        dispatch_semaphore_signal(finishSemaphore);
-                    }
-                });
-                coverSheet.imageIndex++;
+                        [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
+                        CGImageRelease(image);
+                        if (coverSheet.imagesProcessed == numberOfFrameTimes)
+                        {
+                            [coverSheet saveImageFile];
+                            dispatch_semaphore_signal(finishSemaphore);
+                        }
+                    });
+                    coverSheet.imageIndex++;
+                }
+                if (result == AVAssetImageGeneratorCancelled)
+                {
+                    NSLog(@"Canceled");
+                    dispatch_semaphore_signal(finishSemaphore);
+                }
             }
-            if (result == AVAssetImageGeneratorCancelled)
-            {
-                NSLog(@"Canceled");
-                dispatch_semaphore_signal(finishSemaphore);
-            }
-        }
-    };
-    
-    dispatch_async(sharedConcurrentQueue, ^
-    {
+        };
+        
         [imageGenerator generateCGImagesAsynchronouslyForTimes:times
                                 completionHandler:imageCreatedCompletionHandler];
         
     });
 }
 
-+(dispatch_queue_t)createConcurrentQueue
++(dispatch_queue_t)createSerialQueue
 {
     dispatch_queue_t myQueue;
     // myQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-    myQueue = dispatch_queue_create("com.yvs.sharedserialqueue", DISPATCH_QUEUE_SERIAL);
+    myQueue = dispatch_queue_create("com.yvs.makecoversheet.sharedserialqueue",
+                                    DISPATCH_QUEUE_SERIAL);
     return myQueue;
 }
 
