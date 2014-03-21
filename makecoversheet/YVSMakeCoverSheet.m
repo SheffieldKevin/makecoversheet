@@ -354,7 +354,7 @@ static NSString *_utiType;
                     // NSString *actualTimeString = (NSString *)CFBridgingRelease(
                     //                  CMTimeCopyDescription(NULL, actualTime));
                     // NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-                    dispatch_sync(coverSheet.serialQueue, ^
+                    dispatch_async(coverSheet.serialQueue, ^
                     {
                         [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
                         CGImageRelease(image);
