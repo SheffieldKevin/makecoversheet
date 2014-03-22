@@ -465,12 +465,9 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
                                currentSheet*100.0 / numSheets, (long)currentSheet]);
 			}
             currentSheet++;
-            if (currentSheet < numSheets)
-            {
-                dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
-            }
+            dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
-		while( currentSheet < numSheets );
+		while( currentSheet < numSheets - 1 );
         
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");
