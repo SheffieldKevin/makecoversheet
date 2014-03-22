@@ -69,6 +69,8 @@
 +(size_t)coverSheetHeight;
 +(void)setCoverSheetHeight:(size_t)theCoverSheetHeight;
 
++(void)incrementSheetsProcessed;
+
 /**
  The current cover sheet maker is the one which we are sending images to, which
  are to be added to the cover sheet. There may be others that are still processing
@@ -122,6 +124,7 @@ static size_t _numRows;
 static CGFloat _borderSize;
 static size_t _coverSheetWidth;
 static size_t _coverSheetHeight;
+static size_t _sheetsProcessed;
 static CGSize _thumbnailSize;
 static size_t _coverSheetIndex;
 static NSURL *_destinationFolder;
@@ -258,6 +261,19 @@ static NSString *_utiType;
     _coverSheetHeight = theCoverSheetHeight;
 }
 
++(size_t)sheetsProcessed
+{
+    return _sheetsProcessed;
+}
+
++(void)incrementSheetsProcessed
+{
+    @synchronized(self)
+    {
+        _sheetsProcessed++;
+    }
+}
+
 #pragma mark Public Class Methods implementation
 
 +(void)initialize
@@ -287,41 +303,6 @@ static NSString *_utiType;
     self.baseName = baseName;
     self.backColor = backColor;
     self.utiType = theUtiType;
-}
-
-+(void)drawImageToCoverSheetAsThumbnail:(CGImageRef)image
-{
-    // The AVAsset image generator with handler release the image when the
-    // handler returns. Before adding the image to the queue with dispatch
-    // async we need to retain the image. But that means once we've drawn it
-    // we need to release it.
-    CGImageRetain(image);
-    @synchronized(self)
-    {
-        YVSMakeCoverSheet *maker = self.currentCoverSheetMaker;
-        if (maker == nil)
-        {
-            maker = [[self alloc] initWithCoverSheetIndex:self.coverSheetIndex++];
-            self.currentCoverSheetMaker = maker;
-        }
-        size_t thumbIndex = maker.imageIndex;
-#if USE_SHARED_SERIAL_QUEUE
-        dispatch_async(sharedSerialQueue, ^
-        {
-            [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
-            CGImageRelease(image);
-        });
-#else
-        dispatch_async(maker.serialQueue, ^
-        {
-           [maker drawToCoverSheetThumbnail:image atIndex:thumbIndex];
-           CGImageRelease(image);
-        });
-#endif
-        maker.imageIndex++;
-        if (maker.imageIndex == self.numRows * self.numColumns)
-            self.currentCoverSheetMaker = nil;
-    }
 }
 
 +(void)makeCoverSheetFromSourceAsset:(AVAsset *)sourceAsset
@@ -361,6 +342,7 @@ static NSString *_utiType;
                         if (coverSheet.imagesProcessed == numberOfFrameTimes)
                         {
                             [coverSheet saveImageFile];
+                            [YVSMakeCoverSheet incrementSheetsProcessed];
                             dispatch_semaphore_signal(finishSemaphore);
                         }
                     });
