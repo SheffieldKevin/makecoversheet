@@ -2,8 +2,6 @@
 
 Scaling done using CoreImage with no queues to distribute work.
 
-Test results reported here are for running the command line tool built from the branch this TestsResults.md file is in.
-
 I'm running a MacBookPro9,1. That's a quad core i7 running at 2.3 GHz, 16GByte of Ram, and a 500 GByte SSD drive. Not Retina. Has a discrete and an integrated GPU.
 
 Thumbnail: 250x141 pixels
