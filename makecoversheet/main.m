@@ -110,7 +110,16 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 		if ( ! strcmp ( args, "source" ) )
 		{
 			[self setSourcePath: [@(*argv++) stringByExpandingTildeInPath] ];
-			gotsource = YES;
+            NSFileManager *fileManager = [NSFileManager defaultManager];
+            if ([fileManager fileExistsAtPath:self.sourcePath])
+            {
+                gotsource = YES;
+            }
+            else
+            {
+                printNSString([NSString stringWithFormat:
+                               @"Invalid source file path: %@\n", self.sourcePath]);
+            }
 			argc--;
 		}
 		else if (( ! strcmp ( args, "dest" )) || ( ! strcmp ( args, "destination" )) )
