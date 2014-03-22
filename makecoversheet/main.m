@@ -113,9 +113,12 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
             NSFileManager *fileManager = [NSFileManager defaultManager];
             if ([fileManager fileExistsAtPath:self.sourcePath])
             {
-                printNSString([NSString stringWithFormat:
-                            @"Invalid source file path: %@\n", self.sourcePath]);
                 gotsource = YES;
+            }
+            else
+            {
+                printNSString([NSString stringWithFormat:
+                               @"Invalid source file path: %@\n", self.sourcePath]);
             }
 			argc--;
 		}
@@ -460,7 +463,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
             currentSheet++;
 			dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
-		while( currentSheet < numSheets );
+		while( currentSheet < numSheets - 1 );
         
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");
