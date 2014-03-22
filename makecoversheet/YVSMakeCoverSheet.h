@@ -38,7 +38,8 @@
  cover sheet fills the cover sheet then after it is drawn then the cover sheet
  should save itself to disk.
 */
-+(void)drawImageToCoverSheetAsThumbnail:(CGImageRef)image;
+
++(size_t)sheetsProcessed;
 
 +(void)makeCoverSheetFromSourceAsset:(AVAsset *)sourceAsset
                      finishSemaphore:(dispatch_semaphore_t)finishSemaphore

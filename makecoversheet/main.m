@@ -457,17 +457,20 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 		{
 			dispatch_time_t dispatchTime = DISPATCH_TIME_FOREVER;
 			// if we dont want progress, we will wait until it finishes.
+            currentSheet = YVSMakeCoverSheet.sheetsProcessed;
 			if ([self showProgress])
 			{
-                //				dispatchTime = getDispatchTimeFromSeconds((float)1.0);
 				printNSString([NSString stringWithFormat:
                 @"running progress=%3.2f%% Sheet number: %ld",
                                currentSheet*100.0 / numSheets, (long)currentSheet]);
 			}
-            currentSheet++;
+            if (currentSheet >= numSheets)
+            {
+                break;
+            }
             dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
 		}
-		while( currentSheet < numSheets - 1 );
+		while( true );
         
 		if ([self showProgress])
 			printNSString(@"AVAssetImageGenerator finished progress");
