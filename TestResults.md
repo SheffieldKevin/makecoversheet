@@ -26,6 +26,5 @@ Running time using gcd queues and core image to scale frames hdd:
 
 For the hdd drive there is too many different concurrent requests for data from the same file for the disk to deal with. In this example the performance of the hdd drive is about a 1/3rd of that of the SSD drive. But performance drops further if asking for 1200 frame grabs and makecoversheet regularly doesn't  finish and is locked up with 100s of threads.
 
-Jim Crate suggested using NSOperationQueues in which you can limit the number of running concurrent threads. See the nsuseoperation branch.
 
 † The situation is worse than the numbers show. The tool makecoversheet gets stuck, only by pausing the tool and then continuing does the tool actually run to completion.
