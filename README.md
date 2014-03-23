@@ -1,7 +1,7 @@
 makecoversheet
 =========
 
-Demonstrates using AVFoundation to grab movie frames at times and using Core Image to scale the movie frames down to thumbnail images which are then drawn to a coversheet. The cover sheets are then saved to a folder.
+Demonstrates using AVFoundation to grab movie frames at times and the use of Core Image or CoreGraphics to scale movie frames down to thumbnail images which are then drawn to a coversheet. The cover sheets are then saved to a folder. The different branches are different attempts to use gcd and nsoperation queues to distribute work to improve performance.
 
 ### Uses
 
@@ -25,22 +25,22 @@ I'm running a MacBookPro9,1. That's a quad core i7 running at 2.3 GHz, 16GByte o
 
 Apart from initial tests from makecoversheet built from the master branch (see below) the remaining tests were all done on a ten minute quicktime movie with dimensions 960x540. The CoreGraphics context into which all thumbnails ended up being drawn to is 1310x810 pixels, 8 bits per channel and with a Generic linear RGB colorspace. [Please see test results](TestResults.md)
 
-The first speed tests results were done solely on makecoversheet built from the master branch (CoreImage for scaling the images, no queues). Basically these tests were done for a quick and dirty look at the impact colorspace, and using integer or color components on speed and what was the impact when specifying that CoreImage should do a software render instead of rendering using the GPU.
+The speed tests results below were done solely on makecoversheet built from the master branch (CoreImage for scaling the images, no queues). These tests were done for a quick and dirty look at the impact colorspace, and using integer or float values for each color components on speed and what was the impact when specifying that CoreImage should do a software render instead of rendering using the GPU.
 
 None of these differences were significant in terms of execution time. The worst case was the CoreImage software render which slowed things down by about 6% compared to the fastest run and doubled CPU usage of makecoversheet.
 
-Testing of makecoversheet on a 960x540 hour long Apple MPEG4 movie file.
+Testing of makecoversheet was done using a 960x540 pixel, hour long Apple MPEG4 movie file.
 I requested a frame grab every 3 seconds. This resulted in 1202 frames. The cover sheets are 1310x810 pixels in size with a grid of 5x5 thumbnails (250x141 pixels) drawn to each coversheet. This generated 48 full cover sheets, and one coversheet with 2 images. The cover sheets were saved as tiff files as I found especially in comparison to png files that this was significantly faster.
 
-With the colorspace pulled from the grame grabbed image, and using a RGB 8 bits per channel context the tool took 65.5 seconds to run.
+* With the colorspace pulled from the grame grabbed image, and using a RGB 8 bits per channel context the tool took 65.5 seconds to run.
 
-When I tried using a 32 bits per channel float linear Generic RGB colorspace the tool took 66.1 seconds to run.
+* When I tried using a 32 bits per channel float linear Generic RGB colorspace the tool took 66.1 seconds to run.
 
-When I tried using a 8 bits per channel integer linear Generic RGB colorspace the tool took 67.1 seconds to run.
+* When I tried using a 8 bits per channel integer linear Generic RGB colorspace the tool took 67.1 seconds to run.
 
-When I tried using a 32 bits per channel float sRGB colorspace the tool took 68.5 seconds to run.
+* When I tried using a 32 bits per channel float sRGB colorspace the tool took 68.5 seconds to run.
 
-When I tried using the software render 8 bits per channel linear Generic RGB colorspace the tool took 69.5 seconds to run.
+* When I tried using the software render 8 bits per channel linear Generic RGB colorspace the tool took 69.5 seconds to run.
 
 At 67 seconds the command line tool is processing approximately 18 frames per second.
 
