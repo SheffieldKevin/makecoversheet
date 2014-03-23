@@ -1,4 +1,5 @@
-### Test Results - GCD queues for image scaling and NSOperationQueues for creating AVAssetImageGenerator objects. The max number of NSOperationQueues concurrent queues allowed to operate at the same time is set to the number of processors as returned by NSProcessInfo process count.
+### Test Results - GCD queues for image scaling and NSOperationQueues for creating AVAssetImageGenerator objects.
+The max number of NSOperationQueues concurrent queues allowed to operate at the same time is set to the number of processors as returned by NSProcessInfo process count.
 
 Scaling done using GCD queues to distribute work.
 
