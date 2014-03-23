@@ -13,7 +13,6 @@
 @import QuartzCore; // Don't bother excluding if we're not using CoreImage.
 
 #define USE_COREIMAGE 0
-#define USE_SHARED_SERIAL_QUEUE 1
 
 #pragma mark Private Interface for YVSMakeCoverSheet
 
@@ -85,26 +84,13 @@
 +(YVSMakeCoverSheet *)currentCoverSheetMaker;
 +(void)setCurrentCoverSheetMaker:(YVSMakeCoverSheet *)theCoverSheetMaker;
 
-// Currently implementing a single serial queue to hand out the
-// work for each YVSMakeCoverSheet object. Each YVSMakeCoverSheet object then
-// creates an interial serial queue for processing the images.
-+(dispatch_queue_t)createSerialQueue;
-
 #pragma mark Private Interface
 
 -(void)setContext:(CGContextRef)context;
 
 -(void)saveImageFile;
--(void)saveIfReady;
 
 -(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(size_t)index;
-
-/**
- @brief Have all positions in the cover sheet have thumbnails drawn.
- @discussion Check this after calling drawToCoverSheetThumbnail and if true
- then you can call the method saveImageFile to save the thumbnail.
-*/
--(BOOL)coverSheetFull;
 
 @end
 
@@ -113,9 +99,6 @@
 @implementation YVSMakeCoverSheet
 
 #pragma mark Class members
-
-// A concurrent queue shared between all YVSMakeCoverSheet objects.
-static dispatch_queue_t sharedSerialQueue;
 
 // Do not access the following directly. Use accessors.
 //====================================================================
@@ -276,14 +259,6 @@ static NSString *_utiType;
 
 #pragma mark Public Class Methods implementation
 
-+(void)initialize
-{
-    if (self == [YVSMakeCoverSheet class])
-    {
-        sharedSerialQueue = [self createSerialQueue];
-    }
-}
-
 +(void)coverSheetInitializersWithColumns:(size_t)cols
                                     rows:(size_t)rows
                               borderSize:(size_t)borderSize
@@ -310,81 +285,47 @@ static NSString *_utiType;
                              atTimes:(NSArray *)times
                      coverSheetIndex:(size_t)index
 {
-    //    dispatch_async(sharedSerialQueue, ^
-    //{
-        YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
-        size_t numberOfFrameTimes = [times count];
-        AVAssetImageGenerator *imageGenerator;
-        imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
-        [imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
-		[imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
-        AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
-        imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
-                                          CMTime actualTime,
-                                          AVAssetImageGeneratorResult result,
-                                          NSError *error)
-        {
-            @autoreleasepool
-            {
-                if (result == AVAssetImageGeneratorSucceeded)
-                {
-                    size_t thumbIndex = coverSheet.imageIndex;
-                    CGImageRetain(image);
-                    // NSString *requestedTimeString = (NSString *)CFBridgingRelease(
-                    // CMTimeCopyDescription(NULL, requestedTime));
-                    // NSString *actualTimeString = (NSString *)CFBridgingRelease(
-                    //                  CMTimeCopyDescription(NULL, actualTime));
-                    // NSLog(@"Requested: %@; actual %@", requestedTimeString, actualTimeString);
-                    dispatch_async(coverSheet.serialQueue, ^
-                    {
-                        [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
-                        CGImageRelease(image);
-                        if (coverSheet.imagesProcessed == numberOfFrameTimes)
-                        {
-                            [coverSheet saveImageFile];
-                            [YVSMakeCoverSheet incrementSheetsProcessed];
-                            dispatch_semaphore_signal(finishSemaphore);
-                        }
-                    });
-                    coverSheet.imageIndex++;
-                }
-                if (result == AVAssetImageGeneratorCancelled)
-                {
-                    NSLog(@"Canceled");
-                    dispatch_semaphore_signal(finishSemaphore);
-                }
-            }
-        };
-        
-        [imageGenerator generateCGImagesAsynchronouslyForTimes:times
-                                completionHandler:imageCreatedCompletionHandler];
-        
-    //    });
-}
-
-+(dispatch_queue_t)createSerialQueue
-{
-    dispatch_queue_t myQueue;
-    // myQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-    myQueue = dispatch_queue_create("com.yvs.makecoversheet.sharedserialqueue",
-                                    DISPATCH_QUEUE_SERIAL);
-    return myQueue;
-}
-
-// Called when we've finished. This should be called on the last cover sheet
-// so that a part finished cover sheet can be saved when there are no more images
-// to be added.
-+(void)finalize
-{
-    @synchronized(self)
+    YVSMakeCoverSheet *coverSheet = [[self alloc] initWithCoverSheetIndex:index];
+    size_t numberOfFrameTimes = [times count];
+    AVAssetImageGenerator *imageGenerator;
+    imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
+    [imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
+    [imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
+    AVAssetImageGeneratorCompletionHandler imageCreatedCompletionHandler;
+    imageCreatedCompletionHandler = ^(CMTime requestedTime, CGImageRef image,
+                                      CMTime actualTime,
+                                      AVAssetImageGeneratorResult result,
+                                      NSError *error)
     {
-        if (self.currentCoverSheetMaker)
+        @autoreleasepool
         {
-            // Might need a mechanim to wait to save
-            self.currentCoverSheetMaker.saveOnPartialCoverSheet = YES;
-            self.currentCoverSheetMaker = nil;
+            if (result == AVAssetImageGeneratorSucceeded)
+            {
+                size_t thumbIndex = coverSheet.imageIndex;
+                CGImageRetain(image);
+                dispatch_async(coverSheet.serialQueue, ^
+                {
+                    [coverSheet drawToCoverSheetThumbnail:image atIndex:thumbIndex];
+                    CGImageRelease(image);
+                    if (coverSheet.imagesProcessed == numberOfFrameTimes)
+                    {
+                        [coverSheet saveImageFile];
+                        [YVSMakeCoverSheet incrementSheetsProcessed];
+                        dispatch_semaphore_signal(finishSemaphore);
+                    }
+                });
+                coverSheet.imageIndex++;
+            }
+            if (result == AVAssetImageGeneratorCancelled)
+            {
+                NSLog(@"Canceled");
+                dispatch_semaphore_signal(finishSemaphore);
+            }
         }
-    }
+    };
+    
+    [imageGenerator generateCGImagesAsynchronouslyForTimes:times
+                            completionHandler:imageCreatedCompletionHandler];
 }
 
 #pragma mark Private class initializer.
@@ -395,7 +336,10 @@ static NSString *_utiType;
     if (self)
     {
         self->_coverSheetIndex = coverSheetIndex;
-        self.serialQueue = dispatch_queue_create("com.yvsmakecoversheet", DISPATCH_QUEUE_SERIAL);
+        self.serialQueue = dispatch_queue_create("com.yvs.makecoversheet",
+                                                 DISPATCH_QUEUE_SERIAL);
+        dispatch_set_target_queue(self.serialQueue,
+                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
 #if USE_COREIMAGE
         self.ciFilter = [CIFilter filterWithName:@"CILanczosScaleTransform"];
 #endif
@@ -406,12 +350,6 @@ static NSString *_utiType;
 -(void)dealloc
 {
     self.context = nil;
-}
-
--(BOOL)coverSheetFull
-{
-    return ((self.imageIndex % (YVSMakeCoverSheet.numColumns *
-                                YVSMakeCoverSheet.numRows)) == 0);
 }
 
 -(void)drawToCoverSheetThumbnail:(CGImageRef)image atIndex:(size_t)index
@@ -474,7 +412,6 @@ static NSString *_utiType;
     {
         self.imagesProcessed += 1;
     }
-    [self saveIfReady];
 }
 
 -(void)setContext:(CGContextRef)theContext
@@ -489,20 +426,6 @@ static NSString *_utiType;
 -(CGContextRef)context
 {
     return self->_context;
-}
-
--(void)saveIfReady
-{
-    size_t maxImageNum = YVSMakeCoverSheet.numRows * YVSMakeCoverSheet.numColumns;
-    @synchronized(self)
-    {
-        if (self.imagesProcessed >= maxImageNum ||
-                (self.saveOnPartialCoverSheet &&
-                 (self.imagesProcessed == self.imageIndex)))
-        {
-            [self saveImageFile];
-        }
-    }
 }
 
 -(void)saveImageFile

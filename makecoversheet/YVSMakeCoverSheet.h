@@ -38,15 +38,16 @@
  cover sheet fills the cover sheet then after it is drawn then the cover sheet
  should save itself to disk.
 */
-
 +(size_t)sheetsProcessed;
 
+/**
+ Create a AVAssetImageGenerator for the cover sheet, then use its async image
+ generator to generate the images.
+*/
 +(void)makeCoverSheetFromSourceAsset:(AVAsset *)sourceAsset
                      finishSemaphore:(dispatch_semaphore_t)finishSemaphore
                              atTimes:(NSArray *)times
                      coverSheetIndex:(size_t)index;
-
-+(void)finalize;
 
 -(void)dealloc;
 

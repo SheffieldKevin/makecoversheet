@@ -329,16 +329,6 @@ typedef enum { kSpecifyTimes, kSpecifyNumber, kSpecifyPeriod } FrameGrabTimesTyp
 	return nil;
 }
 
-/*
-static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
-{
-	long long milliseconds = seconds * 1000.0;
-	dispatch_time_t waitTime;
-	waitTime = dispatch_time(DISPATCH_TIME_NOW, 1000000LL * milliseconds);
-	return waitTime;
-}
-*/
-
 - (int)run
 {
 	NSURL   *sourceURL;
@@ -389,9 +379,6 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
 			return NO;
 		}
         
-		// imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:sourceAsset];
-		// [imageGenerator setRequestedTimeToleranceAfter:kCMTimeZero];
-		// [imageGenerator setRequestedTimeToleranceBefore:kCMTimeZero];
 		if ([self verbose])
 		{
 			printNSString([NSString stringWithFormat:
@@ -433,7 +420,7 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
         size_t numSheets = ceil(numTimes / (1.0 * numThumbnailsPerSheet));
         dispatch_semaphore_t sessionWaitSemaphore = dispatch_semaphore_create(0);
         NSOperationQueue *sheetQueue = [NSOperationQueue new];
-        sheetQueue.maxConcurrentOperationCount = [[NSProcessInfo processInfo] processorCount];
+        int maxAddedOperations = 4;
         for (int sheetIdx = 0 ; sheetIdx < numSheets ; sheetIdx++)
         {
             NSRange sheetRange = NSMakeRange(sheetIdx*numThumbnailsPerSheet,
@@ -450,6 +437,20 @@ static dispatch_time_t getDispatchTimeFromSeconds(float seconds)
                                                          atTimes:sheetTimes
                                                  coverSheetIndex:sheetIdx];
             }];
+            
+            size_t currentSheet = YVSMakeCoverSheet.sheetsProcessed;
+            if (sheetIdx > currentSheet + maxAddedOperations)
+            {
+                dispatch_time_t dispatchTime = DISPATCH_TIME_FOREVER;
+                if ([self showProgress])
+                {
+                    printNSString([NSString stringWithFormat:
+                                   @"running progress=%3.2f%% Sheet number: %ld",
+                                   currentSheet*100.0 / numSheets,
+                                   (long)currentSheet]);
+                }
+                dispatch_semaphore_wait(sessionWaitSemaphore, dispatchTime);
+            }
         }
 
         size_t currentSheet = 0;
